@@ -8,14 +8,14 @@ from ..database import Base
 
 
 class PurchaseOrder(Base):
-    """采购订单模型"""
+    """采购订单明细模型 - 每条记录是订单中的一个产品"""
     __tablename__ = "purchase_orders"
 
     # 主键
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
 
-    # 订单基本信息
-    order_no = Column(String(50), unique=True, index=True, nullable=False, comment="订单编号")
+    # 订单基本信息（一个订单可以有多个产品，所以不设置unique）
+    order_no = Column(String(50), index=True, nullable=False, comment="订单编号")
     product_name = Column(String(200), index=True, nullable=False, comment="产品名称")
     purchase_amount = Column(Float, nullable=False, comment="采购金额")
 
@@ -35,10 +35,12 @@ class PurchaseOrder(Base):
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), comment="更新时间")
 
     # 创建复合索引以提高查询性能
+    # 添加复合唯一索引：订单号+产品名称保证唯一
     __table_args__ = (
         Index('idx_date_shop', 'order_date', 'shop_name'),
         Index('idx_product_shop', 'product_name', 'shop_name'),
         Index('idx_payment_shop', 'payment_status', 'shop_name'),
+        Index('idx_order_product', 'order_no', 'product_name', unique=True),
     )
 
     def __repr__(self):

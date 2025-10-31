@@ -31,27 +31,47 @@ def clean_and_import_excel(file_path: str):
     db = SessionLocal()
 
     try:
-        # 读取CAISHENDAO数据
+        # 读取CAISHENDAO数据 - 使用正确的列位置
         print("\n📊 读取 CAISHENDAO 数据...")
-        df1 = pd.read_excel(file_path, sheet_name='CAISHENDAO', skiprows=6)
-        order_columns = ['日期', '初始状态', '订单编号', '产品名称', '采购金额', '时间', '先采后付']
-        orders_df1 = df1[order_columns].copy()
-        orders_df1 = orders_df1.dropna(subset=['订单编号', '产品名称'])
-        orders_df1 = orders_df1[orders_df1['订单编号'].astype(str).str.len() > 10]
+
+        # 直接读取原始数据，不用header
+        df1_raw = pd.read_excel(file_path, sheet_name='CAISHENDAO', header=None)
+
+        # 订单数据在第10-16列（索引从0开始）
+        # 从第7行开始（跳过表头和汇总行）
+        orders_df1 = df1_raw.iloc[7:, 10:17].copy()
+        orders_df1.columns = ['日期', '初始状态', '订单编号', '产品名称', '采购金额', '时间', '先采后付']
+
+        # 清理数据
+        orders_df1 = orders_df1.dropna(subset=['订单编号', '产品名称'], how='all')
+        orders_df1['订单编号'] = orders_df1['订单编号'].astype(str)
+        orders_df1 = orders_df1[orders_df1['订单编号'].str.len() > 10]
+        orders_df1['采购金额'] = pd.to_numeric(orders_df1['采购金额'], errors='coerce')
+        orders_df1 = orders_df1.dropna(subset=['采购金额'])
+
         orders_df1['店铺'] = 'CAISHENDAO'
         orders_df1 = orders_df1.rename(columns={'先采后付': '支付状态'})
 
         print(f"   找到 {len(orders_df1)} 条订单")
 
-        # 读取Kitchen maestro数据
+        # 读取Kitchen maestro数据 - 使用正确的列位置
         print("\n📊 读取 Kitchen maestro 数据...")
-        df2 = pd.read_excel(file_path, sheet_name='Kitchen maestro', skiprows=6)
-        order_columns2 = ['日期', '初始状态', '订单编号', '产品名称', '采购金额', '时间', '采购方式']
-        orders_df2 = df2[order_columns2].copy()
-        orders_df2 = orders_df2.dropna(subset=['订单编号', '产品名称'])
-        orders_df2 = orders_df2[orders_df2['订单编号'].astype(str).str.len() > 10]
+
+        # 直接读取原始数据，不用header
+        df2_raw = pd.read_excel(file_path, sheet_name='Kitchen maestro', header=None)
+
+        # 订单数据也在第10-16列（索引从0开始）
+        # 从第7行开始（跳过表头和汇总行）
+        orders_df2 = df2_raw.iloc[7:, 10:17].copy()
+        orders_df2.columns = ['日期', '初始状态', '订单编号', '产品名称', '采购金额', '时间', '采购方式']
+
+        # 清理数据
+        orders_df2 = orders_df2.dropna(subset=['订单编号', '产品名称'], how='all')
+        orders_df2['订单编号'] = orders_df2['订单编号'].astype(str)
+        orders_df2 = orders_df2[orders_df2['订单编号'].str.len() > 10]
         orders_df2['采购金额'] = pd.to_numeric(orders_df2['采购金额'], errors='coerce')
         orders_df2 = orders_df2.dropna(subset=['采购金额'])
+
         orders_df2['店铺'] = 'Kitchen maestro'
         orders_df2 = orders_df2.rename(columns={'采购方式': '支付状态'})
 
@@ -61,21 +81,26 @@ def clean_and_import_excel(file_path: str):
         all_orders = pd.concat([orders_df1, orders_df2], ignore_index=True)
         print(f"\n📦 总计 {len(all_orders)} 条订单（合并前）")
 
-        # ⭐ 关键步骤：去重处理
+        # ⭐ 数据清理（不去重 - 一个订单可以有多个产品）
         # 先清理无效数据
         all_orders = all_orders.dropna(subset=['订单编号', '产品名称', '采购金额'])
 
-        # 检查重复订单
-        duplicate_count = all_orders['订单编号'].duplicated().sum()
-        if duplicate_count > 0:
-            print(f"\n⚠️  发现 {duplicate_count} 条重复订单号")
-            print("   去重策略: 保留每个订单号的最后一条记录（最新数据）")
+        # 统计订单明细
+        unique_orders = all_orders['订单编号'].nunique()
+        total_items = len(all_orders)
+        print(f"\n📦 订单统计:")
+        print(f"   唯一订单数: {unique_orders}")
+        print(f"   订单明细数: {total_items}")
+        print(f"   平均每单产品数: {total_items/unique_orders:.2f}")
 
-            # 按订单号去重，保留最后一条（通常是最新的）
-            all_orders = all_orders.drop_duplicates(subset=['订单编号'], keep='last')
-            print(f"   去重后: {len(all_orders)} 条唯一订单")
+        # 按订单号+产品名称去重（防止完全重复的记录）
+        dup_count = all_orders.duplicated(subset=['订单编号', '产品名称']).sum()
+        if dup_count > 0:
+            print(f"\n⚠️  发现 {dup_count} 条完全重复的订单明细")
+            all_orders = all_orders.drop_duplicates(subset=['订单编号', '产品名称'], keep='last')
+            print(f"   去重后: {len(all_orders)} 条明细")
 
-        print(f"\n📦 准备导入 {len(all_orders)} 条唯一订单")
+        print(f"\n📦 准备导入 {len(all_orders)} 条订单明细")
 
         # 清空现有数据
         db.query(PurchaseOrder).delete()
