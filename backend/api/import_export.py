@@ -67,6 +67,12 @@ async def import_excel(file: UploadFile = File(...), db: Session = Depends(get_d
                 orders_df['采购金额'] = pd.to_numeric(orders_df['采购金额'], errors='coerce')
                 orders_df = orders_df.dropna(subset=['采购金额'])
 
+                # ⭐ 去重处理：保留每个订单号的最后一条记录
+                duplicate_count = orders_df['订单编号'].duplicated().sum()
+                if duplicate_count > 0:
+                    print(f"Sheet {sheet_name}: 发现 {duplicate_count} 条重复订单，自动去重")
+                    orders_df = orders_df.drop_duplicates(subset=['订单编号'], keep='last')
+
                 # 导入数据
                 for idx, row in orders_df.iterrows():
                     try:

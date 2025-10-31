@@ -59,7 +59,23 @@ def clean_and_import_excel(file_path: str):
 
         # 合并数据
         all_orders = pd.concat([orders_df1, orders_df2], ignore_index=True)
-        print(f"\n📦 总计 {len(all_orders)} 条订单待导入")
+        print(f"\n📦 总计 {len(all_orders)} 条订单（合并前）")
+
+        # ⭐ 关键步骤：去重处理
+        # 先清理无效数据
+        all_orders = all_orders.dropna(subset=['订单编号', '产品名称', '采购金额'])
+
+        # 检查重复订单
+        duplicate_count = all_orders['订单编号'].duplicated().sum()
+        if duplicate_count > 0:
+            print(f"\n⚠️  发现 {duplicate_count} 条重复订单号")
+            print("   去重策略: 保留每个订单号的最后一条记录（最新数据）")
+
+            # 按订单号去重，保留最后一条（通常是最新的）
+            all_orders = all_orders.drop_duplicates(subset=['订单编号'], keep='last')
+            print(f"   去重后: {len(all_orders)} 条唯一订单")
+
+        print(f"\n📦 准备导入 {len(all_orders)} 条唯一订单")
 
         # 清空现有数据
         db.query(PurchaseOrder).delete()
@@ -69,14 +85,16 @@ def clean_and_import_excel(file_path: str):
         # 导入数据
         imported_count = 0
         error_count = 0
+        skipped_count = 0
 
         for idx, row in all_orders.iterrows():
             try:
-                # 跳过采购金额为NaN或无效的行
+                # 二次验证数据有效性
                 if pd.isna(row['采购金额']) or pd.isna(row['订单编号']) or pd.isna(row['产品名称']):
-                    error_count += 1
+                    skipped_count += 1
                     continue
 
+                # 创建订单对象
                 order = PurchaseOrder(
                     order_no=str(row['订单编号']),
                     product_name=str(row['产品名称']),
@@ -87,25 +105,37 @@ def clean_and_import_excel(file_path: str):
                     payment_status=str(row['支付状态']) if pd.notna(row['支付状态']) else None,
                     shop_name=str(row['店铺'])
                 )
+
                 db.add(order)
                 imported_count += 1
 
-                # 每100条提交一次
-                if imported_count % 100 == 0:
-                    db.commit()
-                    print(f"   已导入 {imported_count} 条...")
+                # 每50条提交一次（减小批次避免大事务）
+                if imported_count % 50 == 0:
+                    try:
+                        db.commit()
+                        print(f"   已导入 {imported_count} 条...")
+                    except Exception as commit_error:
+                        print(f"   ⚠️  提交失败，回滚并继续: {commit_error}")
+                        db.rollback()
+                        error_count += 1
 
             except Exception as e:
                 error_count += 1
-                print(f"   ⚠️  第 {idx} 行导入失败: {e}")
-                db.rollback()  # 回滚失败的事务
+                print(f"   ⚠️  第 {idx} 行处理失败: {str(e)[:100]}")
+                db.rollback()
                 continue
 
         # 提交剩余数据
-        db.commit()
+        try:
+            db.commit()
+            print(f"   最终提交完成")
+        except Exception as e:
+            print(f"   ⚠️  最终提交失败: {e}")
+            db.rollback()
 
         print(f"\n✅ 导入完成!")
         print(f"   成功: {imported_count} 条")
+        print(f"   跳过: {skipped_count} 条")
         print(f"   失败: {error_count} 条")
 
         # 统计信息
