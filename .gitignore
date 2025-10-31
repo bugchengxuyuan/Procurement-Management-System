@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+venv/
+env/
+ENV/
+
+# Backend
+backend/*.db
+backend/*.db-journal
+*.log
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+.vscode/
+.idea/
+
+# Frontend build
+frontend/dist/
+frontend/.vite/
+
+# Temp files
+*.tmp
+*.bak
+*.swp
+.env
+.env.local
+
+# Excel files (optional - keep the source file)
+# *.xlsx
+# *.xls
