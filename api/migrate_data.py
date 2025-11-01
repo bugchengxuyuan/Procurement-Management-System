@@ -68,11 +68,29 @@ def migrate_from_old_database():
                 from datetime import datetime, date
                 order_date = order_dict["order_date"]
                 if isinstance(order_date, str):
-                    order_date = datetime.strptime(order_date, "%Y-%m-%d").date()
+                    order_date = datetime.strptime(order_date.strip(), "%Y-%m-%d").date()
 
                 record_time = order_dict["record_time"]
                 if isinstance(record_time, str):
-                    record_time = datetime.strptime(record_time, "%Y-%m-%d %H:%M:%S.%f")
+                    # 尝试多种日期时间格式
+                    record_time = record_time.strip()
+                    formats = [
+                        "%Y-%m-%d %H:%M:%S.%f",  # 带微秒
+                        "%Y-%m-%d %H:%M:%S",     # 不带微秒
+                        "%Y-%m-%d",              # 只有日期
+                    ]
+                    parsed = False
+                    for fmt in formats:
+                        try:
+                            record_time = datetime.strptime(record_time, fmt)
+                            parsed = True
+                            break
+                        except ValueError:
+                            continue
+
+                    if not parsed:
+                        # 如果所有格式都失败，尝试只取日期部分
+                        record_time = datetime.strptime(record_time.split()[0], "%Y-%m-%d")
 
                 # 创建新订单
                 order = PurchaseOrder(
@@ -118,7 +136,7 @@ def migrate_from_old_database():
         print("=" * 70)
         print(f"订单总数: {total_orders}")
         print(f"产品总数: {total_products}")
-        print(f"采购总额: ¥{total_amount:,.2f}")
+        print(f"采购总额: ¥{total_amount:,.2f}" if total_amount else "采购总额: ¥0.00")
         print("=" * 70)
 
     old_conn.close()
