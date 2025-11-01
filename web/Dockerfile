@@ -3,9 +3,9 @@ FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-# 安装依赖
-COPY package.json ./
-RUN npm install
+# 安装依赖（先复制package文件以利用Docker缓存）
+COPY package.json package-lock.json* ./
+RUN npm ci --quiet
 
 # 复制源代码并构建
 COPY . .

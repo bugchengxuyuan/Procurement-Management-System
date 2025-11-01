@@ -12,7 +12,7 @@ export default function PaymentDuePage() {
   const [statusFilter, setStatusFilter] = useState<string>('all')
 
   // 获取账期数据
-  const { data, isLoading } = useQuery({
+  const { data, isLoading } = useQuery<PaymentDue[]>({
     queryKey: ['payment-due'],
     queryFn: statisticsApi.getPaymentDue,
   })
