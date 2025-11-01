@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  # 后端服务
+  api:
+    build: ./api
+    container_name: procurement-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - DATABASE_URL=sqlite:////app/data/procurement.db
+    restart: unless-stopped
+
+  # 前端服务
+  web:
+    build: ./web
+    container_name: procurement-web
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  data:
