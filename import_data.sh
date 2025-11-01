@@ -53,12 +53,12 @@ else
     echo "ℹ️  数据库不存在，将创建新数据库"
 fi
 
-# 运行数据迁移
+# 运行数据导入
 echo ""
 echo "4. 开始导入数据..."
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 cd api || exit 1
-python3 migrate_data.py
+python3 import_excel.py
 
 # 检查导入结果
 echo ""

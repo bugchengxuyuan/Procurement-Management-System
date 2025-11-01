@@ -26,11 +26,32 @@ def generate_order_no() -> str:
 
 def parse_excel_orders(file_content: bytes):
     """解析Excel文件中的订单数据"""
-    df = pd.read_excel(BytesIO(file_content), sheet_name="CAISHENDAO", header=None)
+    # 尝试读取Excel文件，自动检测工作表
+    try:
+        # 先尝试读取所有工作表名称
+        xl = pd.ExcelFile(BytesIO(file_content))
+        sheet_names = xl.sheet_names
 
-    # 提取数据（从第7行开始，列10-16）
-    df_data = df.iloc[7:, 10:17].copy()
-    df_data.columns = ["日期", "初始状态", "订单编号", "产品名称", "采购金额", "时间", "先采后付"]
+        # 优先使用CAISHENDAO工作表，否则使用第一个工作表
+        sheet_name = "CAISHENDAO" if "CAISHENDAO" in sheet_names else sheet_names[0]
+
+        df = pd.read_excel(BytesIO(file_content), sheet_name=sheet_name, header=None)
+
+        # 检测数据格式
+        # 如果第一行包含"日期"、"产品名称"等，说明是新格式（表头在第一行，数据从第二行开始）
+        first_row = df.iloc[0].astype(str).tolist()
+
+        if "日期" in first_row and "产品名称" in first_row:
+            # 新格式：数据在列0-6，第一行是表头
+            df_data = df.iloc[1:, :7].copy()
+            df_data.columns = ["日期", "初始状态", "订单编号", "产品名称", "采购金额", "时间", "先采后付"]
+        else:
+            # 旧格式：数据在列10-16，从第7行开始
+            df_data = df.iloc[7:, 10:17].copy()
+            df_data.columns = ["日期", "初始状态", "订单编号", "产品名称", "采购金额", "时间", "先采后付"]
+
+    except Exception as e:
+        raise ValueError(f"无法读取Excel文件: {str(e)}")
 
     orders = []
     errors = []
