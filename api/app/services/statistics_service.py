@@ -2,14 +2,27 @@
 统计服务
 """
 from datetime import date, timedelta
+from typing import Optional
 from sqlmodel import Session, select, func
 from ..models import PurchaseOrder, Product
 from ..core.config import settings
 
 
-def get_dashboard_stats(session: Session):
-    """获取仪表盘统计数据"""
-    # 总体统计
+def get_dashboard_stats(
+    session: Session,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None
+):
+    """获取仪表盘统计数据
+
+    Args:
+        session: 数据库会话
+        start_date: 开始日期（可选），用于筛选月度趋势
+        end_date: 结束日期（可选），用于筛选月度趋势
+
+    注意：采购总额、订单总数、产品总数等始终显示所有数据，不受时间筛选影响
+    """
+    # 总体统计（不受时间筛选影响，始终显示所有数据）
     total_stats = session.exec(
         select(
             func.sum(PurchaseOrder.purchase_amount).label("total_amount"),
@@ -19,7 +32,7 @@ def get_dashboard_stats(session: Session):
 
     total_products = session.exec(select(func.count(Product.id))).one()
 
-    # 本月统计
+    # 本月统计（不受时间筛选影响）
     today = date.today()
     first_day_of_month = date(today.year, today.month, 1)
     this_month_amount = session.exec(
@@ -28,7 +41,7 @@ def get_dashboard_stats(session: Session):
         )
     ).first()
 
-    # 上月统计
+    # 上月统计（不受时间筛选影响）
     if today.month == 1:
         last_month_start = date(today.year - 1, 12, 1)
         last_month_end = date(today.year - 1, 12, 31)
@@ -53,7 +66,7 @@ def get_dashboard_stats(session: Session):
     else:
         growth = -100 if this_month_val == 0 else 100
 
-    # 支付方式分布
+    # 支付方式分布（不受时间筛选影响）
     payment_distribution = {}
     payment_stats = session.exec(
         select(
@@ -69,19 +82,38 @@ def get_dashboard_stats(session: Session):
             "amount": float(amount or 0),
         }
 
-    # 月度趋势（最近6个月）
+    # 月度趋势（受时间筛选影响）
     monthly_trend = []
-    trend_stats = session.exec(
-        select(
-            func.strftime("%Y-%m", PurchaseOrder.order_date).label("month"),
-            func.sum(PurchaseOrder.purchase_amount).label("amount"),
-            func.count(PurchaseOrder.id).label("count"),
-        ).group_by(
-            func.strftime("%Y-%m", PurchaseOrder.order_date)
-        ).order_by(
-            func.strftime("%Y-%m", PurchaseOrder.order_date).desc()
-        ).limit(6)
-    ).all()
+
+    # 构建月度趋势查询
+    trend_query = select(
+        func.strftime("%Y-%m", PurchaseOrder.order_date).label("month"),
+        func.sum(PurchaseOrder.purchase_amount).label("amount"),
+        func.count(PurchaseOrder.id).label("count"),
+    )
+
+    # 如果指定了时间范围，则筛选
+    if start_date and end_date:
+        trend_query = trend_query.where(
+            PurchaseOrder.order_date >= start_date,
+            PurchaseOrder.order_date <= end_date,
+        )
+    elif start_date:
+        trend_query = trend_query.where(PurchaseOrder.order_date >= start_date)
+    elif end_date:
+        trend_query = trend_query.where(PurchaseOrder.order_date <= end_date)
+
+    trend_query = trend_query.group_by(
+        func.strftime("%Y-%m", PurchaseOrder.order_date)
+    ).order_by(
+        func.strftime("%Y-%m", PurchaseOrder.order_date).desc()
+    )
+
+    # 如果没有指定时间范围，默认显示最近6个月
+    if not start_date and not end_date:
+        trend_query = trend_query.limit(6)
+
+    trend_stats = session.exec(trend_query).all()
 
     for month, amount, count in trend_stats:
         monthly_trend.append({
@@ -90,7 +122,7 @@ def get_dashboard_stats(session: Session):
             "count": count,
         })
 
-    # TOP产品
+    # TOP产品（不受时间筛选影响）
     total_product_amount = session.exec(
         select(func.sum(Product.total_purchase_amount))
     ).one()
@@ -124,6 +156,10 @@ def get_dashboard_stats(session: Session):
         "payment_distribution": payment_distribution,
         "monthly_trend": monthly_trend,
         "top_products": top_products,
+        "date_range": {
+            "start_date": start_date.isoformat() if start_date else None,
+            "end_date": end_date.isoformat() if end_date else None,
+        }
     }
 
 

@@ -68,6 +68,10 @@ export interface DashboardStats {
     order_count: number
     percentage: number
   }>
+  date_range: {
+    start_date: string | null
+    end_date: string | null
+  }
 }
 
 export interface PaymentDue {

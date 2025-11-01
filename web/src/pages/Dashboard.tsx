@@ -1,17 +1,26 @@
 /**
  * 数据总览页面
  */
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Card, Row, Col, Statistic, Progress, Table, Spin } from 'antd'
+import { Card, Row, Col, Statistic, Progress, Table, Spin, DatePicker, Space, Button, Alert } from 'antd'
 import { ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons'
 import ReactECharts from 'echarts-for-react'
+import { Dayjs } from 'dayjs'
 import { statisticsApi } from '@/services/statistics'
 import type { DashboardStats } from '@/types'
 
+const { RangePicker } = DatePicker
+
 export default function Dashboard() {
+  const [dateRange, setDateRange] = useState<[Dayjs | null, Dayjs | null] | null>(null)
+
   const { data: stats, isLoading } = useQuery<DashboardStats>({
-    queryKey: ['dashboard'],
-    queryFn: statisticsApi.getDashboard,
+    queryKey: ['dashboard', dateRange?.[0]?.format('YYYY-MM-DD'), dateRange?.[1]?.format('YYYY-MM-DD')],
+    queryFn: () => statisticsApi.getDashboard(
+      dateRange?.[0]?.format('YYYY-MM-DD'),
+      dateRange?.[1]?.format('YYYY-MM-DD')
+    ),
   })
 
   if (isLoading) {
@@ -19,6 +28,14 @@ export default function Dashboard() {
   }
 
   if (!stats) return null
+
+  const handleDateChange = (dates: any) => {
+    setDateRange(dates)
+  }
+
+  const handleReset = () => {
+    setDateRange(null)
+  }
 
   // 月度趋势图表配置
   const trendChartOption = {
@@ -75,6 +92,30 @@ export default function Dashboard() {
 
   return (
     <div style={{ padding: '24px' }}>
+      {/* 时间筛选器 */}
+      <Card style={{ marginBottom: 16 }}>
+        <Space direction="vertical" style={{ width: '100%' }}>
+          <Space>
+            <span>月度趋势时间范围：</span>
+            <RangePicker
+              value={dateRange}
+              onChange={handleDateChange}
+              format="YYYY-MM-DD"
+              placeholder={['开始日期', '结束日期']}
+            />
+            {dateRange && (
+              <Button onClick={handleReset}>重置</Button>
+            )}
+          </Space>
+          <Alert
+            message="说明：采购总额、订单总数、产品总数等始终显示所有数据。时间筛选仅影响月度采购趋势图表。"
+            type="info"
+            showIcon
+            style={{ marginTop: 8 }}
+          />
+        </Space>
+      </Card>
+
       <Row gutter={[16, 16]}>
         {/* 统计卡片 */}
         <Col xs={24} sm={12} lg={6}>
