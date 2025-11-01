@@ -5,6 +5,31 @@ import pandas as pd
 from datetime import datetime
 from typing import List, Dict, Any
 from io import BytesIO
+import random
+import time
+
+
+def generate_order_no() -> str:
+    """
+    Generate a 19-digit order number similar to 1688 order format
+
+    Returns:
+        19-digit order number as string
+    """
+    # Use timestamp + random number to generate unique order number
+    timestamp = int(time.time() * 1000)  # milliseconds
+    random_num = random.randint(1000, 9999)
+
+    # Generate 19-digit number
+    order_no = f"{timestamp}{random_num}"
+
+    # Ensure it's exactly 19 digits
+    if len(order_no) > 19:
+        order_no = order_no[:19]
+    elif len(order_no) < 19:
+        order_no = order_no + '0' * (19 - len(order_no))
+
+    return order_no
 
 
 def read_excel_file(file_content: bytes, sheet_name: str = "sheet") -> pd.DataFrame:
@@ -64,7 +89,17 @@ def parse_order_data(df: pd.DataFrame) -> List[Dict[str, Any]]:
             order_data = {}
 
             # Required fields
-            order_data["order_no"] = str(int(row.get("订单编号", ""))).strip() if pd.notna(row.get("订单编号")) else None
+            # Auto-generate order_no if missing
+            order_no_value = row.get("订单编号")
+            if pd.notna(order_no_value) and str(order_no_value).strip():
+                try:
+                    order_data["order_no"] = str(int(order_no_value)).strip()
+                except:
+                    order_data["order_no"] = str(order_no_value).strip()
+            else:
+                # Auto-generate order number if missing
+                order_data["order_no"] = generate_order_no()
+
             order_data["product_name"] = str(row.get("产品名称", "")).strip() if pd.notna(row.get("产品名称")) else None
             order_data["purchase_amount"] = float(row.get("采购金额", 0)) if pd.notna(row.get("采购金额")) else None
 
@@ -93,11 +128,7 @@ def parse_order_data(df: pd.DataFrame) -> List[Dict[str, Any]]:
                 # Use order_date as record_time if not provided
                 order_data["record_time"] = datetime.combine(order_data["order_date"], datetime.min.time()) if order_data["order_date"] else datetime.now()
 
-            # Validation
-            if not order_data["order_no"]:
-                errors.append({"row": idx + 2, "error": "订单编号缺失"})
-                continue
-
+            # Validation (order_no is always generated, no need to check)
             if not order_data["product_name"]:
                 errors.append({"row": idx + 2, "error": "产品名称缺失"})
                 continue
