@@ -4,16 +4,20 @@ echo "=========================================="
 echo "  采购数据导入脚本"
 echo "=========================================="
 
-# 项目目录
-PROJECT_DIR="/home/user/Procurement-Management-System"
-cd "$PROJECT_DIR" || exit 1
+# 获取脚本所在目录（项目根目录）
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd "$SCRIPT_DIR" || exit 1
+
+echo "📁 项目目录: $SCRIPT_DIR"
 
 # 检查Excel文件
 echo ""
 echo "1. 检查Excel文件..."
 if [ ! -f "采购表-2（最新版.xlsx" ]; then
     echo "❌ 错误: 找不到Excel文件 '采购表-2（最新版.xlsx'"
-    echo "请将Excel文件放在项目根目录: $PROJECT_DIR"
+    echo "请将Excel文件放在项目根目录: $SCRIPT_DIR"
+    echo ""
+    echo "提示: 您的Excel文件名可能不同，请修改脚本中的文件名"
     exit 1
 fi
 echo "✅ 找到Excel文件"
@@ -22,7 +26,7 @@ echo "✅ 找到Excel文件"
 echo ""
 echo "2. 检查数据目录..."
 mkdir -p data
-echo "✅ 数据目录就绪: $PROJECT_DIR/data/"
+echo "✅ 数据目录就绪: $SCRIPT_DIR/data/"
 
 # 备份现有数据库（如果存在）
 echo ""

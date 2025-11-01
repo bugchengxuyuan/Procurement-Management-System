@@ -4,9 +4,17 @@ echo "=========================================="
 echo "  采购管理系统 v2.0 - 启动脚本"
 echo "=========================================="
 
+# 获取脚本所在目录（项目根目录）
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd "$SCRIPT_DIR" || exit 1
+
+echo "📁 项目目录: $SCRIPT_DIR"
+echo ""
+
 # 检查是否在项目根目录
 if [ ! -d "api" ] || [ ! -d "web" ]; then
-    echo "错误: 请在项目根目录下运行此脚本"
+    echo "❌ 错误: 找不到 api 或 web 目录"
+    echo "请确保在项目根目录下运行此脚本"
     exit 1
 fi
 
@@ -21,7 +29,7 @@ cd ..
 
 echo "2. 启动后端服务..."
 cd api
-python run.py > ../data/api.log 2>&1 &
+python3 run.py > ../data/api.log 2>&1 &
 API_PID=$!
 echo "   后端 PID: $API_PID"
 cd ..
