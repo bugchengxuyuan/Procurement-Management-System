@@ -3,7 +3,6 @@ import { Card, Row, Col, Statistic, Table, Progress, Spin } from 'antd';
 import { ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons';
 import { Column } from '@ant-design/charts';
 import { getDashboardStats, DashboardStats } from '@/services/statistics';
-import dayjs from 'dayjs';
 
 const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
@@ -32,12 +31,6 @@ const Dashboard: React.FC = () => {
       </div>
     );
   }
-
-  // 支付方式数据
-  const paymentData = Object.entries(stats.payment_distribution).map(([name, data]) => ({
-    type: name,
-    value: data.amount,
-  }));
 
   // 月度趋势配置
   const monthlyConfig = {

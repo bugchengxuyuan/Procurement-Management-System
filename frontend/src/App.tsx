@@ -1,6 +1,5 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { Layout } from 'antd';
 import AppLayout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import OrderList from './pages/OrderList';
