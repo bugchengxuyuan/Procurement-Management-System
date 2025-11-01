@@ -5,6 +5,7 @@ from datetime import datetime, date
 from decimal import Decimal
 from typing import Optional
 from sqlmodel import SQLModel, Field, Column, Numeric
+from pydantic import field_serializer
 
 
 class Product(SQLModel, table=True):
@@ -19,3 +20,8 @@ class Product(SQLModel, table=True):
     last_purchase_date: Optional[date] = None
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
+
+    @field_serializer('total_purchase_amount', 'avg_unit_price')
+    def serialize_decimal(self, value: Decimal) -> float:
+        """将Decimal转换为float用于JSON序列化"""
+        return float(value)

@@ -5,6 +5,7 @@ from datetime import datetime, date
 from decimal import Decimal
 from typing import Optional
 from sqlmodel import SQLModel, Field, Column, Numeric
+from pydantic import field_serializer
 
 
 class PurchaseOrderBase(SQLModel):
@@ -16,6 +17,11 @@ class PurchaseOrderBase(SQLModel):
     order_status: str = Field(index=True, max_length=20)
     payment_method: str = Field(index=True, max_length=20)
     record_time: datetime
+
+    @field_serializer('purchase_amount')
+    def serialize_amount(self, value: Decimal) -> float:
+        """将Decimal转换为float用于JSON序列化"""
+        return float(value)
 
 
 class PurchaseOrder(PurchaseOrderBase, table=True):
