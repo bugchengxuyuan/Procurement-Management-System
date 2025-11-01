@@ -53,6 +53,14 @@
 - **Pandas** - Excel数据处理
 - **SQLite/PostgreSQL** - 数据库
 
+### 前端
+- **React 18** - UI框架
+- **TypeScript 5** - 类型安全
+- **Vite 5** - 构建工具
+- **Ant Design 5** - UI组件库
+- **Ant Design Charts** - 数据可视化
+- **Axios** - HTTP客户端
+
 ### 数据库设计
 - `purchase_orders` - 采购订单表
 - `products` - 产品主数据表
@@ -62,14 +70,16 @@
 
 ## 快速开始
 
-### 1. 安装依赖
+### 后端启动
+
+#### 1. 安装依赖
 
 ```bash
 cd backend
 pip install -r requirements.txt
 ```
 
-### 2. 配置环境变量
+#### 2. 配置环境变量
 
 复制`.env.example`为`.env`并修改配置：
 
@@ -89,7 +99,7 @@ DATABASE_URL=sqlite:///./procurement.db
 SECRET_KEY=your-secret-key-change-in-production
 ```
 
-### 3. 导入Excel数据
+#### 3. 导入Excel数据
 
 将现有的Excel采购数据导入数据库：
 
@@ -99,19 +109,53 @@ python migrate_excel.py
 
 **注意**: 修改`migrate_excel.py`中的Excel文件路径为你的实际文件路径。
 
-### 4. 启动服务器
+#### 4. 启动后端服务器
 
 ```bash
 python main.py
 ```
 
-服务器将在 `http://localhost:8000` 启动。
+后端服务器将在 `http://localhost:8000` 启动。
 
-### 5. 访问API文档
+#### 5. 访问API文档
 
 FastAPI自动生成的交互式API文档：
 - Swagger UI: http://localhost:8000/docs
 - ReDoc: http://localhost:8000/redoc
+
+---
+
+### 前端启动
+
+#### 1. 安装依赖
+
+```bash
+cd frontend
+npm install
+```
+
+或使用yarn:
+```bash
+yarn install
+```
+
+#### 2. 启动开发服务器
+
+```bash
+npm run dev
+```
+
+前端应用将在 `http://localhost:3000` 启动。
+
+#### 3. 访问应用
+
+打开浏览器访问: http://localhost:3000
+
+**默认页面**:
+- 数据概览: http://localhost:3000/dashboard
+- 订单管理: http://localhost:3000/orders
+- 产品管理: http://localhost:3000/products
+- 先采后付: http://localhost:3000/payment-due
 
 ---
 
@@ -407,7 +451,29 @@ Procurement-Management-System/
 │       ├── __init__.py
 │       └── excel.py           # Excel处理
 │
-├── frontend/                   # 前端项目（待开发）
+├── frontend/                   # 前端项目
+│   ├── src/
+│   │   ├── components/         # 公共组件
+│   │   │   └── Layout/        # 布局组件
+│   │   ├── pages/             # 页面组件
+│   │   │   ├── Dashboard/     # 数据概览
+│   │   │   ├── OrderList/     # 订单管理
+│   │   │   ├── ProductList/   # 产品管理
+│   │   │   └── PaymentDue/    # 先采后付
+│   │   ├── services/          # API服务
+│   │   │   ├── api.ts         # Axios配置
+│   │   │   ├── order.ts       # 订单API
+│   │   │   ├── product.ts     # 产品API
+│   │   │   ├── statistics.ts  # 统计API
+│   │   │   └── import-export.ts # 导入导出
+│   │   ├── App.tsx            # 主应用
+│   │   ├── main.tsx           # 入口文件
+│   │   └── index.css          # 全局样式
+│   ├── package.json           # NPM依赖
+│   ├── vite.config.ts         # Vite配置
+│   ├── tsconfig.json          # TypeScript配置
+│   └── README.md              # 前端文档
+│
 ├── docs/                       # 文档
 ├── tests/                      # 测试
 └── README.md                   # 项目说明
