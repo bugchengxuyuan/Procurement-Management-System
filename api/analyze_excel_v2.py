@@ -96,8 +96,32 @@ class OrderAnalyzer:
             self.df = df_raw.iloc[7:, 10:17].copy()
             self.df.columns = ["日期", "初始状态", "订单编号", "产品名称", "采购金额", "时间", "先采后付"]
 
+        # 调试：打印一些原始采购金额数据
+        print(f"\n【原始数据样本】")
+        print("-" * 80)
+        sample_indices = [322, 394, 492, 566, 639]
+        for idx in sample_indices:
+            if idx in self.df.index:
+                raw_val = self.df.loc[idx, '采购金额']
+                print(f"  索引 {idx}: 采购金额原始值 = '{raw_val}' (类型: {type(raw_val).__name__})")
+
         # 数据类型转换
-        self.df['采购金额'] = pd.to_numeric(self.df['采购金额'], errors='coerce')
+        # 清洗采购金额：去除空格、逗号等常见字符
+        def clean_amount(val):
+            if pd.isna(val):
+                return np.nan
+            val_str = str(val).strip()
+            # 移除常见的非数字字符（保留小数点和负号）
+            val_str = val_str.replace(',', '').replace('，', '').replace(' ', '')
+            val_str = val_str.replace('¥', '').replace('￥', '').replace('元', '')
+            if val_str == '' or val_str == 'nan':
+                return np.nan
+            try:
+                return float(val_str)
+            except (ValueError, AttributeError):
+                return np.nan
+
+        self.df['采购金额'] = self.df['采购金额'].apply(clean_amount)
         self.df['日期'] = pd.to_datetime(self.df['日期'], errors='coerce')
 
         print(f"\n【基础信息】")
