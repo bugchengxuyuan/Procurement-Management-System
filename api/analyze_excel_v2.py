@@ -96,6 +96,10 @@ class OrderAnalyzer:
             self.df = df_raw.iloc[7:, 10:17].copy()
             self.df.columns = ["日期", "初始状态", "订单编号", "产品名称", "采购金额", "时间", "先采后付"]
 
+        # 数据类型转换
+        self.df['采购金额'] = pd.to_numeric(self.df['采购金额'], errors='coerce')
+        self.df['日期'] = pd.to_datetime(self.df['日期'], errors='coerce')
+
         print(f"\n【基础信息】")
         print("-" * 80)
         print(f"总行数: {len(df_raw)}")
