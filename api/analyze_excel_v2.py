@@ -11,6 +11,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 from collections import defaultdict
+from io import BytesIO
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -74,12 +75,31 @@ class OrderAnalyzer:
         print(f"\n文件: {self.excel_path}")
         print(f"分析时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
-        # 读取数据
-        self.df = pd.read_excel(self.excel_path, sheet_name=0, header=0)
+        # 读取数据 - 使用与parse_excel_orders相同的方式
+        with open(self.excel_path, "rb") as f:
+            file_content = f.read()
+
+        xl = pd.ExcelFile(BytesIO(file_content))
+        sheet_names = xl.sheet_names
+        sheet_name = "CAISHENDAO" if "CAISHENDAO" in sheet_names else sheet_names[0]
+
+        df_raw = pd.read_excel(BytesIO(file_content), sheet_name=sheet_name, header=None)
+        first_row = df_raw.iloc[0].astype(str).tolist()
+
+        # 检测数据格式并提取数据（与parse_excel_orders保持一致）
+        if "日期" in first_row and "产品名称" in first_row:
+            # 新格式：数据在列0-6，第一行是表头
+            self.df = df_raw.iloc[1:, :7].copy()
+            self.df.columns = ["日期", "初始状态", "订单编号", "产品名称", "采购金额", "时间", "先采后付"]
+        else:
+            # 旧格式：数据在列10-16，从第7行开始
+            self.df = df_raw.iloc[7:, 10:17].copy()
+            self.df.columns = ["日期", "初始状态", "订单编号", "产品名称", "采购金额", "时间", "先采后付"]
 
         print(f"\n【基础信息】")
         print("-" * 80)
-        print(f"总行数: {len(self.df)}")
+        print(f"总行数: {len(df_raw)}")
+        print(f"数据行数（去除表头）: {len(self.df)}")
         print(f"总列数: {len(self.df.columns)}")
         print(f"列名: {list(self.df.columns)}")
 
