@@ -10,7 +10,7 @@ from pydantic import field_serializer
 
 class PurchaseOrderBase(SQLModel):
     """订单基础字段"""
-    order_no: str = Field(index=True, unique=True, max_length=50)
+    order_no: str = Field(index=True, max_length=50)  # 移除unique约束以支持一单多品
     product_name: str = Field(index=True, max_length=200)
     purchase_amount: Decimal = Field(sa_column=Column(Numeric(10, 2)))
     order_date: date = Field(index=True)

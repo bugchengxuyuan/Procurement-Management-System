@@ -62,10 +62,12 @@ def import_from_excel(excel_file_path: str):
 
         for order_data in orders:
             try:
-                # 检查订单是否已存在
+                # 检查订单明细是否已存在（订单号+产品名组合）
+                # 这样支持一单多品：同一订单号可以有多个不同产品
                 existing = session.exec(
                     select(PurchaseOrder).where(
-                        PurchaseOrder.order_no == order_data["order_no"]
+                        PurchaseOrder.order_no == order_data["order_no"],
+                        PurchaseOrder.product_name == order_data["product_name"]
                     )
                 ).first()
 
@@ -73,7 +75,7 @@ def import_from_excel(excel_file_path: str):
                     skipped_count += 1
                     continue
 
-                # 创建新订单
+                # 创建新订单明细
                 order = PurchaseOrder(**order_data)
                 session.add(order)
                 success_count += 1
