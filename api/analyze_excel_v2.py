@@ -96,15 +96,6 @@ class OrderAnalyzer:
             self.df = df_raw.iloc[7:, 10:17].copy()
             self.df.columns = ["日期", "初始状态", "订单编号", "产品名称", "采购金额", "时间", "先采后付"]
 
-        # 调试：打印一些原始采购金额数据
-        print(f"\n【原始数据样本】")
-        print("-" * 80)
-        sample_indices = [322, 394, 492, 566, 639]
-        for idx in sample_indices:
-            if idx in self.df.index:
-                raw_val = self.df.loc[idx, '采购金额']
-                print(f"  索引 {idx}: 采购金额原始值 = '{raw_val}' (类型: {type(raw_val).__name__})")
-
         # 数据类型转换
         # 清洗采购金额：去除空格、逗号等常见字符
         def clean_amount(val):
@@ -395,9 +386,12 @@ class OrderAnalyzer:
             print(f"\n{error_type}: {len(error_list)} 条")
             for error in error_list[:5]:
                 row_idx = error['row']
+                # DataFrame索引 = df_raw索引 = Excel行号 - 1
+                # 所以 Excel行号 = DataFrame索引 + 1
+                excel_row = row_idx + 1
                 if row_idx in self.df.index:
                     row = self.df.loc[row_idx]
-                    print(f"  行{row_idx}: 订单号={row.get('订单编号', 'N/A')}, "
+                    print(f"  Excel行{excel_row}: 订单号={row.get('订单编号', 'N/A')}, "
                           f"产品={row.get('产品名称', 'N/A')}, "
                           f"金额={row.get('采购金额', 'N/A')}")
 
