@@ -62,12 +62,13 @@ def import_from_excel(excel_file_path: str):
 
         for order_data in orders:
             try:
-                # 检查订单明细是否已存在（订单号+产品名组合）
-                # 这样支持一单多品：同一订单号可以有多个不同产品
+                # 检查订单明细是否已存在（订单号+产品名+规格组合）
+                # 这样支持一单多品：同一订单号可以有多个不同产品或规格
                 existing = session.exec(
                     select(PurchaseOrder).where(
                         PurchaseOrder.order_no == order_data["order_no"],
-                        PurchaseOrder.product_name == order_data["product_name"]
+                        PurchaseOrder.product_name == order_data["product_name"],
+                        PurchaseOrder.spec == order_data.get("spec")
                     )
                 ).first()
 
@@ -166,7 +167,7 @@ if __name__ == "__main__":
     else:
         # 默认使用项目根目录下的Excel文件
         project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        excel_file = os.path.join(project_root, "采购表-2（最新版.xlsx")
+        excel_file = os.path.join(project_root, "采购表.xlsx")
 
     success = import_from_excel(excel_file)
     sys.exit(0 if success else 1)

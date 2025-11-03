@@ -29,3 +29,15 @@ def get_dashboard(
 def get_payment_due(session: Session = Depends(get_session)):
     """获取账期跟踪列表"""
     return statistics_service.get_payment_due_list(session)
+
+
+@router.get("/suppliers")
+def get_suppliers(session: Session = Depends(get_session)):
+    """获取所有供应商列表"""
+    return statistics_service.get_unique_suppliers(session)
+
+
+@router.get("/specs")
+def get_specs(session: Session = Depends(get_session)):
+    """获取所有规格列表"""
+    return statistics_service.get_unique_specs(session)

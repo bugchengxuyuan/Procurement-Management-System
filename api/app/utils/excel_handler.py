@@ -25,7 +25,7 @@ def generate_order_no() -> str:
 
 
 def parse_excel_orders(file_content: bytes):
-    """解析Excel文件中的订单数据"""
+    """解析Excel文件中的订单数据（支持规格和供应商字段）"""
     # 尝试读取Excel文件，自动检测工作表
     try:
         # 先尝试读取所有工作表名称
@@ -42,13 +42,25 @@ def parse_excel_orders(file_content: bytes):
         first_row = df.iloc[0].astype(str).tolist()
 
         if "日期" in first_row and "产品名称" in first_row:
-            # 新格式：数据在列0-6，第一行是表头
-            df_data = df.iloc[1:, :7].copy()
-            df_data.columns = ["日期", "初始状态", "订单编号", "产品名称", "采购金额", "时间", "先采后付"]
+            # 检查是否包含规格和供应商字段（新格式v2）
+            if "规格" in first_row and "供应商" in first_row:
+                # 新格式v2：包含规格和供应商，9列
+                df_data = df.iloc[1:, :9].copy()
+                df_data.columns = ["日期", "初始状态", "订单编号", "产品名称", "规格", "采购金额", "供应商", "时间", "先采后付"]
+            else:
+                # 新格式v1：没有规格和供应商，7列
+                df_data = df.iloc[1:, :7].copy()
+                df_data.columns = ["日期", "初始状态", "订单编号", "产品名称", "采购金额", "时间", "先采后付"]
+                # 添加空的规格和供应商列
+                df_data["规格"] = None
+                df_data["供应商"] = None
         else:
             # 旧格式：数据在列10-16，从第7行开始
             df_data = df.iloc[7:, 10:17].copy()
             df_data.columns = ["日期", "初始状态", "订单编号", "产品名称", "采购金额", "时间", "先采后付"]
+            # 添加空的规格和供应商列
+            df_data["规格"] = None
+            df_data["供应商"] = None
 
     except Exception as e:
         raise ValueError(f"无法读取Excel文件: {str(e)}")
@@ -91,7 +103,9 @@ def parse_excel_orders(file_content: bytes):
             order_data = {
                 "order_no": order_no,
                 "product_name": str(row["产品名称"]).strip(),
+                "spec": str(row["规格"]).strip() if pd.notna(row["规格"]) else None,
                 "purchase_amount": float(row["采购金额"]),
+                "supplier": str(row["供应商"]).strip() if pd.notna(row["供应商"]) else None,
                 "order_date": order_date,
                 "order_status": str(row["初始状态"]).strip() if pd.notna(row["初始状态"]) else "已付款",
                 "payment_method": payment_method,
@@ -113,7 +127,7 @@ def export_orders_to_excel(orders):
     ws.title = "订单列表"
 
     # 表头
-    headers = ["订单编号", "产品名称", "采购金额", "订单日期", "订单状态", "支付方式", "记录时间"]
+    headers = ["订单编号", "产品名称", "规格", "采购金额", "供应商", "订单日期", "订单状态", "支付方式", "记录时间"]
     ws.append(headers)
 
     # 设置表头样式
@@ -130,7 +144,9 @@ def export_orders_to_excel(orders):
         ws.append([
             order.order_no,
             order.product_name,
+            order.spec if order.spec else "",
             float(order.purchase_amount),
+            order.supplier if order.supplier else "",
             order.order_date.strftime("%Y-%m-%d"),
             order.order_status,
             order.payment_method,
@@ -138,13 +154,15 @@ def export_orders_to_excel(orders):
         ])
 
     # 调整列宽
-    ws.column_dimensions["A"].width = 25
-    ws.column_dimensions["B"].width = 30
-    ws.column_dimensions["C"].width = 15
-    ws.column_dimensions["D"].width = 15
-    ws.column_dimensions["E"].width = 12
-    ws.column_dimensions["F"].width = 12
-    ws.column_dimensions["G"].width = 20
+    ws.column_dimensions["A"].width = 25  # 订单编号
+    ws.column_dimensions["B"].width = 30  # 产品名称
+    ws.column_dimensions["C"].width = 20  # 规格
+    ws.column_dimensions["D"].width = 15  # 采购金额
+    ws.column_dimensions["E"].width = 30  # 供应商
+    ws.column_dimensions["F"].width = 15  # 订单日期
+    ws.column_dimensions["G"].width = 12  # 订单状态
+    ws.column_dimensions["H"].width = 12  # 支付方式
+    ws.column_dimensions["I"].width = 20  # 记录时间
 
     # 保存到BytesIO
     output = BytesIO()

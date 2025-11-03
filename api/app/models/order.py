@@ -12,7 +12,9 @@ class PurchaseOrderBase(SQLModel):
     """订单基础字段"""
     order_no: str = Field(index=True, max_length=50)  # 移除unique约束以支持一单多品
     product_name: str = Field(index=True, max_length=200)
+    spec: Optional[str] = Field(default=None, index=True, max_length=200)  # 新增：规格字段
     purchase_amount: Decimal = Field(sa_column=Column(Numeric(10, 2)))
+    supplier: Optional[str] = Field(default=None, index=True, max_length=300)  # 新增：供应商字段
     order_date: date = Field(index=True)
     order_status: str = Field(index=True, max_length=20)
     payment_method: str = Field(index=True, max_length=20)
@@ -41,7 +43,9 @@ class PurchaseOrderCreate(PurchaseOrderBase):
 class PurchaseOrderUpdate(SQLModel):
     """更新订单"""
     product_name: Optional[str] = None
+    spec: Optional[str] = None  # 新增：规格字段
     purchase_amount: Optional[Decimal] = None
+    supplier: Optional[str] = None  # 新增：供应商字段
     order_date: Optional[date] = None
     order_status: Optional[str] = None
     payment_method: Optional[str] = None

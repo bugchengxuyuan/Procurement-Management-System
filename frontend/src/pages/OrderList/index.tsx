@@ -76,6 +76,8 @@ const OrderList: React.FC = () => {
     const newFilters: OrderListParams = {
       search: values.search,
       product_name: values.product_name,
+      spec: values.spec,
+      supplier: values.supplier,
       order_status: values.order_status,
       payment_method: values.payment_method,
     };
@@ -207,11 +209,25 @@ const OrderList: React.FC = () => {
       width: 150,
     },
     {
+      title: '规格',
+      dataIndex: 'spec',
+      key: 'spec',
+      width: 120,
+      render: (spec: string | null) => spec || '-',
+    },
+    {
       title: '采购金额',
       dataIndex: 'purchase_amount',
       key: 'purchase_amount',
       width: 120,
       render: (amount: number) => `¥${amount.toFixed(2)}`,
+    },
+    {
+      title: '供应商',
+      dataIndex: 'supplier',
+      key: 'supplier',
+      width: 200,
+      render: (supplier: string | null) => supplier || '-',
     },
     {
       title: '订单状态',
@@ -260,7 +276,7 @@ const OrderList: React.FC = () => {
           <Row gutter={16}>
             <Col span={6}>
               <Form.Item name="search" label="快速搜索">
-                <Input placeholder="订单号/产品名" prefix={<SearchOutlined />} />
+                <Input placeholder="订单号/产品名/供应商" prefix={<SearchOutlined />} />
               </Form.Item>
             </Col>
             <Col span={6}>
@@ -268,6 +284,18 @@ const OrderList: React.FC = () => {
                 <Input placeholder="请输入产品名称" />
               </Form.Item>
             </Col>
+            <Col span={6}>
+              <Form.Item name="spec" label="规格">
+                <Input placeholder="请输入规格" />
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item name="supplier" label="供应商">
+                <Input placeholder="请输入供应商" />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={16}>
             <Col span={6}>
               <Form.Item name="order_status" label="订单状态">
                 <Select placeholder="请选择" allowClear>
@@ -284,15 +312,15 @@ const OrderList: React.FC = () => {
                 </Select>
               </Form.Item>
             </Col>
-          </Row>
-          <Row gutter={16}>
             <Col span={12}>
               <Form.Item name="dateRange" label="日期范围">
                 <RangePicker style={{ width: '100%' }} />
               </Form.Item>
             </Col>
-            <Col span={12}>
-              <Form.Item label=" ">
+          </Row>
+          <Row>
+            <Col span={24}>
+              <Form.Item>
                 <Space>
                   <Button type="primary" htmlType="submit" icon={<SearchOutlined />}>
                     查询
@@ -340,7 +368,7 @@ const OrderList: React.FC = () => {
             setPageSize(pageSize);
           },
         }}
-        scroll={{ x: 1200 }}
+        scroll={{ x: 1500 }}
       />
 
       {/* 新建/编辑订单Modal */}
@@ -370,6 +398,12 @@ const OrderList: React.FC = () => {
             <Input placeholder="请输入产品名称" />
           </Form.Item>
           <Form.Item
+            name="spec"
+            label="规格"
+          >
+            <Input placeholder="请输入规格（可选）" />
+          </Form.Item>
+          <Form.Item
             name="purchase_amount"
             label="采购金额"
             rules={[{ required: true, message: '请输入采购金额' }]}
@@ -381,6 +415,12 @@ const OrderList: React.FC = () => {
               min={0}
               prefix="¥"
             />
+          </Form.Item>
+          <Form.Item
+            name="supplier"
+            label="供应商"
+          >
+            <Input placeholder="请输入供应商（可选）" />
           </Form.Item>
           <Form.Item
             name="order_date"

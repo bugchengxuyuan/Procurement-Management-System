@@ -7,7 +7,9 @@ export interface Order {
   id: number;
   order_no: string;
   product_name: string;
+  spec?: string | null;
   purchase_amount: number;
+  supplier?: string | null;
   order_date: string;
   order_status: string;
   payment_method: string;
@@ -20,6 +22,8 @@ export interface OrderListParams {
   page?: number;
   size?: number;
   product_name?: string;
+  spec?: string;
+  supplier?: string;
   order_status?: string;
   payment_method?: string;
   start_date?: string;
@@ -39,7 +43,9 @@ export interface OrderListResponse {
 export interface OrderCreateParams {
   order_no: string;
   product_name: string;
+  spec?: string;
   purchase_amount: number;
+  supplier?: string;
   order_date: string;
   order_status: string;
   payment_method: string;
@@ -48,7 +54,9 @@ export interface OrderCreateParams {
 
 export interface OrderUpdateParams {
   product_name?: string;
+  spec?: string;
   purchase_amount?: number;
+  supplier?: string;
   order_date?: string;
   order_status?: string;
   payment_method?: string;

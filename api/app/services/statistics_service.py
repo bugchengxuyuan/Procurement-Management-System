@@ -200,3 +200,27 @@ def get_payment_due_list(session: Session):
         })
 
     return result
+
+
+def get_unique_suppliers(session: Session):
+    """获取所有唯一供应商列表"""
+    suppliers = session.exec(
+        select(PurchaseOrder.supplier)
+        .where(PurchaseOrder.supplier.is_not(None))
+        .distinct()
+        .order_by(PurchaseOrder.supplier)
+    ).all()
+
+    return {"suppliers": [s for s in suppliers if s]}
+
+
+def get_unique_specs(session: Session):
+    """获取所有唯一规格列表"""
+    specs = session.exec(
+        select(PurchaseOrder.spec)
+        .where(PurchaseOrder.spec.is_not(None))
+        .distinct()
+        .order_by(PurchaseOrder.spec)
+    ).all()
+
+    return {"specs": [s for s in specs if s]}

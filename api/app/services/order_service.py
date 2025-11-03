@@ -26,6 +26,8 @@ def get_orders(
     page: int = 1,
     page_size: int = 20,
     product_name: Optional[str] = None,
+    spec: Optional[str] = None,
+    supplier: Optional[str] = None,
     order_status: Optional[str] = None,
     payment_method: Optional[str] = None,
     start_date: Optional[date] = None,
@@ -39,6 +41,10 @@ def get_orders(
     # 过滤条件
     if product_name:
         statement = statement.where(PurchaseOrder.product_name == product_name)
+    if spec:
+        statement = statement.where(PurchaseOrder.spec == spec)
+    if supplier:
+        statement = statement.where(PurchaseOrder.supplier == supplier)
     if order_status:
         statement = statement.where(PurchaseOrder.order_status == order_status)
     if payment_method:
@@ -52,6 +58,8 @@ def get_orders(
             or_(
                 PurchaseOrder.order_no.contains(search),
                 PurchaseOrder.product_name.contains(search),
+                PurchaseOrder.spec.contains(search),
+                PurchaseOrder.supplier.contains(search),
             )
         )
 

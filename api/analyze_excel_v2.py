@@ -54,18 +54,25 @@ class OrderAnalyzer:
         unique_products = records['产品名称'].unique()
         different_products = len(unique_products) > 1
 
+        # 检查规格（同一产品不同规格也算不同明细）
+        if '规格' in records.columns:
+            unique_specs = records['规格'].dropna().unique()
+            different_specs = len(unique_specs) > 1
+        else:
+            different_specs = False
+
         # 检查金额
         unique_amounts = records['采购金额'].unique()
 
         # 判断类型
-        if same_date and different_products:
-            return True, 'multi_item_same_day'  # 同一天，多个产品 → 真正的一单多品
-        elif same_date and not different_products:
-            return True, 'duplicate_entry'      # 同一天，同产品 → 重复录入
-        elif not same_date and different_products:
-            return True, 'multi_item_diff_day'  # 不同天，多个产品 → 可能是分批发货
+        if same_date and (different_products or different_specs):
+            return True, 'multi_item_same_day'  # 同一天，多个产品或规格 → 真正的一单多品
+        elif same_date and not different_products and not different_specs:
+            return True, 'duplicate_entry'      # 同一天，同产品同规格 → 重复录入
+        elif not same_date and (different_products or different_specs):
+            return True, 'multi_item_diff_day'  # 不同天，多个产品或规格 → 可能是分批发货
         else:
-            return True, 'data_error'           # 不同天，同产品 → 数据错误
+            return True, 'data_error'           # 不同天，同产品同规格 → 数据错误
 
     def analyze_excel_file(self):
         """完整分析Excel文件"""
@@ -88,13 +95,25 @@ class OrderAnalyzer:
 
         # 检测数据格式并提取数据（与parse_excel_orders保持一致）
         if "日期" in first_row and "产品名称" in first_row:
-            # 新格式：数据在列0-6，第一行是表头
-            self.df = df_raw.iloc[1:, :7].copy()
-            self.df.columns = ["日期", "初始状态", "订单编号", "产品名称", "采购金额", "时间", "先采后付"]
+            # 检查是否包含规格和供应商字段（新格式v2）
+            if "规格" in first_row and "供应商" in first_row:
+                # 新格式v2：包含规格和供应商，9列
+                self.df = df_raw.iloc[1:, :9].copy()
+                self.df.columns = ["日期", "初始状态", "订单编号", "产品名称", "规格", "采购金额", "供应商", "时间", "先采后付"]
+            else:
+                # 新格式v1：没有规格和供应商，7列
+                self.df = df_raw.iloc[1:, :7].copy()
+                self.df.columns = ["日期", "初始状态", "订单编号", "产品名称", "采购金额", "时间", "先采后付"]
+                # 添加空列
+                self.df["规格"] = None
+                self.df["供应商"] = None
         else:
             # 旧格式：数据在列10-16，从第7行开始
             self.df = df_raw.iloc[7:, 10:17].copy()
             self.df.columns = ["日期", "初始状态", "订单编号", "产品名称", "采购金额", "时间", "先采后付"]
+            # 添加空列
+            self.df["规格"] = None
+            self.df["供应商"] = None
 
         # 数据类型转换
         # 清洗采购金额：去除空格、逗号等常见字符
@@ -134,7 +153,13 @@ class OrderAnalyzer:
         # 4. 产品分析
         self._analyze_products()
 
-        # 5. 导入建议
+        # 5. 供应商分析
+        self._analyze_suppliers()
+
+        # 6. 规格分析
+        self._analyze_specs()
+
+        # 7. 导入建议
         self._generate_import_suggestions()
 
     def _analyze_order_source(self):
@@ -282,7 +307,9 @@ class OrderAnalyzer:
                     # 显示产品明细
                     print(f"    明细:")
                     for idx, row in records.iterrows():
-                        print(f"      - {row['产品名称']:20s} ¥{row['采购金额']:8.2f}")
+                        spec_info = f" [{row['规格']}]" if pd.notna(row.get('规格')) else ""
+                        supplier_info = f" - {row['供应商']}" if pd.notna(row.get('供应商')) else ""
+                        print(f"      - {row['产品名称']:20s}{spec_info:15s} ¥{row['采购金额']:8.2f}{supplier_info}")
 
         self.analysis_results['duplicates'] = {
             k: len(v) for k, v in duplicate_analysis.items()
@@ -304,6 +331,95 @@ class OrderAnalyzer:
             print(f"  {i:2d}. {product:25s}: {count:3d} 条订单")
 
         self.analysis_results['product_count'] = unique_products
+
+    def _analyze_suppliers(self):
+        """供应商分析"""
+        print(f"\n\n【供应商统计分析】")
+        print("=" * 80)
+
+        if '供应商' not in self.df.columns or self.df['供应商'].isna().all():
+            print("  没有供应商数据")
+            return
+
+        # 移除空值
+        df_with_supplier = self.df[self.df['供应商'].notna()].copy()
+
+        if len(df_with_supplier) == 0:
+            print("  没有供应商数据")
+            return
+
+        unique_suppliers = df_with_supplier['供应商'].nunique()
+        print(f"\n供应商总数: {unique_suppliers} 个")
+        print(f"有供应商信息的订单: {len(df_with_supplier)}/{len(self.df)} 条 ({len(df_with_supplier)/len(self.df)*100:.1f}%)")
+
+        # 按订单数统计TOP供应商
+        supplier_counts = df_with_supplier['供应商'].value_counts()
+        print(f"\nTOP 10 供应商（按订单数）:")
+        for i, (supplier, count) in enumerate(supplier_counts.head(10).items(), 1):
+            percentage = count / len(df_with_supplier) * 100
+            print(f"  {i:2d}. {supplier:40s}: {count:3d} 条订单 ({percentage:5.1f}%)")
+
+        # 按采购金额统计TOP供应商
+        supplier_amounts = df_with_supplier.groupby('供应商')['采购金额'].sum().sort_values(ascending=False)
+        total_amount = df_with_supplier['采购金额'].sum()
+        print(f"\nTOP 10 供应商（按采购金额）:")
+        for i, (supplier, amount) in enumerate(supplier_amounts.head(10).items(), 1):
+            percentage = amount / total_amount * 100
+            print(f"  {i:2d}. {supplier:40s}: ¥{amount:10,.2f} ({percentage:5.1f}%)")
+
+        # 供应商提供的产品种类
+        supplier_products = df_with_supplier.groupby('供应商')['产品名称'].nunique().sort_values(ascending=False)
+        print(f"\nTOP 10 供应商（按产品种类）:")
+        for i, (supplier, prod_count) in enumerate(supplier_products.head(10).items(), 1):
+            print(f"  {i:2d}. {supplier:40s}: {prod_count:3d} 种产品")
+
+        self.analysis_results['supplier_count'] = unique_suppliers
+
+    def _analyze_specs(self):
+        """规格分析"""
+        print(f"\n\n【规格统计分析】")
+        print("=" * 80)
+
+        if '规格' not in self.df.columns or self.df['规格'].isna().all():
+            print("  没有规格数据")
+            return
+
+        # 移除空值
+        df_with_spec = self.df[self.df['规格'].notna()].copy()
+
+        if len(df_with_spec) == 0:
+            print("  没有规格数据")
+            return
+
+        unique_specs = df_with_spec['规格'].nunique()
+        print(f"\n规格总数: {unique_specs} 种")
+        print(f"有规格信息的订单: {len(df_with_spec)}/{len(self.df)} 条 ({len(df_with_spec)/len(self.df)*100:.1f}%)")
+
+        # 按订单数统计TOP规格
+        spec_counts = df_with_spec['规格'].value_counts()
+        print(f"\nTOP 15 规格（按订单数）:")
+        for i, (spec, count) in enumerate(spec_counts.head(15).items(), 1):
+            percentage = count / len(df_with_spec) * 100
+            print(f"  {i:2d}. {spec:25s}: {count:3d} 条订单 ({percentage:5.1f}%)")
+
+        # 产品与规格的关系
+        print(f"\n产品规格多样性分析:")
+        product_spec_counts = df_with_spec.groupby('产品名称')['规格'].nunique().sort_values(ascending=False)
+        products_with_multiple_specs = product_spec_counts[product_spec_counts > 1]
+
+        if len(products_with_multiple_specs) > 0:
+            print(f"  有多种规格的产品: {len(products_with_multiple_specs)} 个")
+            print(f"\n  TOP 10 多规格产品:")
+            for i, (product, spec_count) in enumerate(products_with_multiple_specs.head(10).items(), 1):
+                specs = df_with_spec[df_with_spec['产品名称'] == product]['规格'].unique()
+                specs_str = ', '.join([str(s) for s in specs[:5]])
+                if len(specs) > 5:
+                    specs_str += f" ... (共{spec_count}种)"
+                print(f"    {i:2d}. {product:25s}: {spec_count} 种规格 ({specs_str})")
+        else:
+            print(f"  所有产品都只有一种规格")
+
+        self.analysis_results['spec_count'] = unique_specs
 
     def _generate_import_suggestions(self):
         """生成导入建议"""
@@ -401,10 +517,21 @@ class OrderAnalyzer:
 
 def main():
     """主函数"""
-    excel_file = "../采购表-2（最新版.xlsx"
+    # 获取Excel文件路径
+    if len(sys.argv) > 1:
+        excel_file = sys.argv[1]
+    else:
+        # 默认使用项目根目录下的Excel文件
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(script_dir)
+        excel_file = os.path.join(project_root, "采购表.xlsx")
 
     if not os.path.exists(excel_file):
         print(f"错误: 找不到文件 {excel_file}")
+        print(f"\n使用方法:")
+        print(f"  python3 analyze_excel_v2.py [Excel文件路径]")
+        print(f"\n示例:")
+        print(f"  python3 analyze_excel_v2.py ../采购表.xlsx")
         return
 
     analyzer = OrderAnalyzer(excel_file)
