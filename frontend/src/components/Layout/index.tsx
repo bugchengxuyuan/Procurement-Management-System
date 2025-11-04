@@ -11,6 +11,7 @@ import {
   ShoppingOutlined,
   AppstoreOutlined,
   ClockCircleOutlined,
+  ShopOutlined,
 } from '@ant-design/icons';
 
 const { Header, Content, Sider } = Layout;
@@ -35,6 +36,11 @@ const AppLayout: React.FC = () => {
       key: '/orders',
       icon: <ShoppingOutlined />,
       label: '订单管理',
+    },
+    {
+      key: '/suppliers',
+      icon: <ShopOutlined />,
+      label: '供应商管理',
     },
     {
       key: '/products',
