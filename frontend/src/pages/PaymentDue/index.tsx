@@ -12,6 +12,11 @@ import {
   Modal,
   Alert,
   Space,
+  Form,
+  DatePicker,
+  Upload,
+  Result,
+  Descriptions,
 } from 'antd';
 import {
   ClockCircleOutlined,
@@ -19,15 +24,19 @@ import {
   WarningOutlined,
   CheckCircleOutlined,
   InfoCircleOutlined,
+  UploadOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
+import type { UploadFile } from 'antd/es/upload/interface';
 import dayjs from 'dayjs';
 import {
   getPaymentDueGroups,
   getPaymentDueGroupDetail,
   markPaymentDueGroupAsPaid,
+  importPaymentBill,
   PaymentDueGroup,
   PaymentDueOrderDetail,
+  BillImportResult,
 } from '@/services/payment-due';
 
 const PaymentDue: React.FC = () => {
@@ -39,6 +48,14 @@ const PaymentDue: React.FC = () => {
   const [selectedGroup, setSelectedGroup] = useState<PaymentDueGroup | null>(null);
   const [orderDetails, setOrderDetails] = useState<PaymentDueOrderDetail[]>([]);
   const [detailTotal, setDetailTotal] = useState(0);
+
+  // 账单导入相关
+  const [importModalVisible, setImportModalVisible] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [resultModalVisible, setResultModalVisible] = useState(false);
+  const [importResult, setImportResult] = useState<BillImportResult | null>(null);
+  const [importForm] = Form.useForm();
 
   useEffect(() => {
     loadGroups();
@@ -93,6 +110,42 @@ const PaymentDue: React.FC = () => {
         }
       },
     });
+  };
+
+  const handleImportBill = async () => {
+    try {
+      const values = await importForm.validateFields();
+
+      if (!uploadFile) {
+        message.error('请选择要上传的文件');
+        return;
+      }
+
+      setImporting(true);
+      const paidDate = values.paid_date.format('YYYY-MM-DD');
+
+      const result = await importPaymentBill(uploadFile, paidDate);
+
+      setImportResult(result);
+      setImportModalVisible(false);
+      setResultModalVisible(true);
+
+      // 刷新列表
+      loadGroups();
+
+      // 清空表单
+      importForm.resetFields();
+      setUploadFile(null);
+
+    } catch (error: any) {
+      if (error.errorFields) {
+        // 表单验证错误
+        return;
+      }
+      message.error(error.response?.data?.detail || '导入失败');
+    } finally {
+      setImporting(false);
+    }
   };
 
   const getStatusTag = (status: string) => {
@@ -346,6 +399,13 @@ const PaymentDue: React.FC = () => {
         <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h3>按还款日分组</h3>
           <Space>
+            <Button
+              type="primary"
+              icon={<UploadOutlined />}
+              onClick={() => setImportModalVisible(true)}
+            >
+              导入1688账单
+            </Button>
             <span>显示已付款账期:</span>
             <Switch checked={includePaid} onChange={setIncludePaid} />
           </Space>
@@ -436,6 +496,177 @@ const PaymentDue: React.FC = () => {
           }}
           scroll={{ x: 1000 }}
         />
+      </Modal>
+
+      {/* 导入账单Modal */}
+      <Modal
+        title="导入1688账单"
+        open={importModalVisible}
+        onOk={handleImportBill}
+        onCancel={() => {
+          setImportModalVisible(false);
+          importForm.resetFields();
+          setUploadFile(null);
+        }}
+        width={600}
+        confirmLoading={importing}
+        okText="开始导入"
+        cancelText="取消"
+      >
+        <Alert
+          message="导入说明"
+          description={
+            <div>
+              <p>1. 从1688下载月度账单Excel文件</p>
+              <p>2. Excel必须包含"订单编号"列（或"订单号"、"order_no"等）</p>
+              <p>3. 系统会自动匹配订单并标记为"账期已结"</p>
+              <p>4. 只能导入状态为"账期未到"的订单</p>
+            </div>
+          }
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+        />
+
+        <Form form={importForm} layout="vertical">
+          <Form.Item
+            name="paid_date"
+            label="实际付款日期"
+            rules={[{ required: true, message: '请选择付款日期' }]}
+          >
+            <DatePicker
+              style={{ width: '100%' }}
+              placeholder="选择实际付款日期"
+              format="YYYY-MM-DD"
+            />
+          </Form.Item>
+
+          <Form.Item
+            label="账单文件"
+            required
+          >
+            <Upload
+              beforeUpload={(file) => {
+                // 验证文件类型
+                const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
+                if (!isExcel) {
+                  message.error('只能上传 Excel 文件（.xlsx 或 .xls）');
+                  return false;
+                }
+
+                // 验证文件大小（10MB）
+                const isLt10M = file.size / 1024 / 1024 < 10;
+                if (!isLt10M) {
+                  message.error('文件大小不能超过 10MB');
+                  return false;
+                }
+
+                setUploadFile(file);
+                return false; // 阻止自动上传
+              }}
+              onRemove={() => {
+                setUploadFile(null);
+              }}
+              fileList={uploadFile ? [{
+                uid: '-1',
+                name: uploadFile.name,
+                status: 'done',
+              }] : []}
+              accept=".xlsx,.xls"
+              maxCount={1}
+            >
+              <Button icon={<UploadOutlined />} block>
+                选择Excel文件
+              </Button>
+            </Upload>
+            <div style={{ marginTop: 8, fontSize: 12, color: '#999' }}>
+              支持格式: .xlsx, .xls | 最大文件: 10MB
+            </div>
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* 导入结果Modal */}
+      <Modal
+        title="账单导入结果"
+        open={resultModalVisible}
+        onOk={() => setResultModalVisible(false)}
+        onCancel={() => setResultModalVisible(false)}
+        width={800}
+        footer={[
+          <Button key="close" type="primary" onClick={() => setResultModalVisible(false)}>
+            关闭
+          </Button>
+        ]}
+      >
+        {importResult && (
+          <>
+            <Result
+              status={importResult.failed_count === 0 && importResult.not_found_count === 0 ? "success" : "warning"}
+              title={`成功导入 ${importResult.success_count} 个订单`}
+              subTitle={`付款日期: ${dayjs(importResult.paid_date).format('YYYY年MM月DD日')}，总金额: ¥${importResult.total_amount.toFixed(2)}`}
+            />
+
+            <Descriptions bordered column={2} size="small">
+              <Descriptions.Item label="成功更新">{importResult.success_count} 单</Descriptions.Item>
+              <Descriptions.Item label="导入时间">{dayjs(importResult.import_time).format('YYYY-MM-DD HH:mm:ss')}</Descriptions.Item>
+              <Descriptions.Item label="未找到订单">{importResult.not_found_count} 单</Descriptions.Item>
+              <Descriptions.Item label="已付款订单">{importResult.already_paid_count} 单</Descriptions.Item>
+              <Descriptions.Item label="失败订单">{importResult.failed_count} 单</Descriptions.Item>
+              <Descriptions.Item label="总付款金额">¥{importResult.total_amount.toFixed(2)}</Descriptions.Item>
+            </Descriptions>
+
+            {importResult.not_found_orders.length > 0 && (
+              <Alert
+                message={`未找到的订单 (${importResult.not_found_orders.length}单)`}
+                description={
+                  <div style={{ maxHeight: 200, overflow: 'auto' }}>
+                    {importResult.not_found_orders.map(no => (
+                      <div key={no} style={{ fontSize: 12 }}>{no}</div>
+                    ))}
+                  </div>
+                }
+                type="warning"
+                showIcon
+                style={{ marginTop: 16 }}
+              />
+            )}
+
+            {importResult.already_paid_orders.length > 0 && (
+              <Alert
+                message={`已付款的订单 (${importResult.already_paid_orders.length}单)`}
+                description={
+                  <div style={{ maxHeight: 200, overflow: 'auto' }}>
+                    {importResult.already_paid_orders.map(no => (
+                      <div key={no} style={{ fontSize: 12 }}>{no}</div>
+                    ))}
+                  </div>
+                }
+                type="info"
+                showIcon
+                style={{ marginTop: 16 }}
+              />
+            )}
+
+            {importResult.errors.length > 0 && (
+              <Alert
+                message={`错误详情 (${importResult.errors.length}单)`}
+                description={
+                  <div style={{ maxHeight: 200, overflow: 'auto' }}>
+                    {importResult.errors.map((err, idx) => (
+                      <div key={idx} style={{ fontSize: 12, marginBottom: 4 }}>
+                        <strong>{err.order_no}:</strong> {err.error}
+                      </div>
+                    ))}
+                  </div>
+                }
+                type="error"
+                showIcon
+                style={{ marginTop: 16 }}
+              />
+            )}
+          </>
+        )}
       </Modal>
 
       <style>{`

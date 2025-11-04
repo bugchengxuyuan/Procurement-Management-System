@@ -30,6 +30,8 @@ export interface PaymentDueOrderDetail {
   order_date: string;
   receive_date?: string | null;
   payment_status?: string;
+  paid_date?: string | null;
+  bill_import_time?: string | null;
   spec?: string | null;
 }
 
@@ -74,4 +76,39 @@ export const getPaymentDueGroupDetail = (
  */
 export const markPaymentDueGroupAsPaid = (dueDate: string): Promise<MarkAsPaidResponse> => {
   return api.post(`/payment-due/groups/${dueDate}/mark-paid`);
+};
+
+/**
+ * 1688账单导入结果
+ */
+export interface BillImportResult {
+  success_count: number;
+  failed_count: number;
+  not_found_count: number;
+  already_paid_count: number;
+  success_orders: string[];
+  not_found_orders: string[];
+  already_paid_orders: string[];
+  errors: Array<{ order_no: string; error: string }>;
+  paid_date: string;
+  import_time: string;
+  total_amount: number;
+}
+
+/**
+ * 导入1688账单Excel并批量更新订单状态
+ */
+export const importPaymentBill = async (
+  file: File,
+  paidDate: string
+): Promise<BillImportResult> => {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('paid_date', paidDate);
+
+  return api.post('/payment-due/import-bill', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
 };

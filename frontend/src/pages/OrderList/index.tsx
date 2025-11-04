@@ -81,8 +81,6 @@ const OrderList: React.FC = () => {
       product_name: values.product_name,
       spec: values.spec,
       supplier: values.supplier,
-      order_status: values.order_status,
-      payment_method: values.payment_method,
       payment_status: values.payment_status,
     };
 
@@ -260,18 +258,6 @@ const OrderList: React.FC = () => {
       render: (date: string | null) => date ? dayjs(date).format('YYYY-MM-DD') : '-',
     },
     {
-      title: '订单状态',
-      dataIndex: 'order_status',
-      key: 'order_status',
-      width: 100,
-    },
-    {
-      title: '支付方式',
-      dataIndex: 'payment_method',
-      key: 'payment_method',
-      width: 100,
-    },
-    {
       title: '付款状态',
       dataIndex: 'payment_status',
       key: 'payment_status',
@@ -333,23 +319,7 @@ const OrderList: React.FC = () => {
             </Col>
           </Row>
           <Row gutter={16}>
-            <Col span={6}>
-              <Form.Item name="order_status" label="订单状态">
-                <Select placeholder="请选择" allowClear>
-                  <Select.Option value="已付款">已付款</Select.Option>
-                  <Select.Option value="先采后付">先采后付</Select.Option>
-                </Select>
-              </Form.Item>
-            </Col>
-            <Col span={6}>
-              <Form.Item name="payment_method" label="支付方式">
-                <Select placeholder="请选择" allowClear>
-                  <Select.Option value="已付款">已付款</Select.Option>
-                  <Select.Option value="先采后付">先采后付</Select.Option>
-                </Select>
-              </Form.Item>
-            </Col>
-            <Col span={6}>
+            <Col span={8}>
               <Form.Item name="payment_status" label="付款状态">
                 <Select placeholder="请选择" allowClear>
                   <Select.Option value="即时付款">即时付款</Select.Option>
@@ -358,7 +328,7 @@ const OrderList: React.FC = () => {
                 </Select>
               </Form.Item>
             </Col>
-            <Col span={6}>
+            <Col span={16}>
               <Form.Item name="dateRange" label="日期范围">
                 <RangePicker style={{ width: '100%' }} />
               </Form.Item>
@@ -414,7 +384,7 @@ const OrderList: React.FC = () => {
             setPageSize(pageSize);
           },
         }}
-        scroll={{ x: 1700 }}
+        scroll={{ x: 1500 }}
       />
 
       {/* 新建/编辑订单Modal */}
