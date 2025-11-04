@@ -173,19 +173,17 @@ def get_payment_due_list(session: Session):
     - 举例：10月确认收货 → 11月8日还款
     - 优先显示未付款订单（payment_status = 'unpaid'），兼容旧数据
     """
-    # 查询先采后付订单
-    # 尝试使用 payment_status 过滤，如果字段不存在则查询全部
+    # 查询"账期未到"的订单（新状态系统）
     try:
-        # 优先查询未付款订单
         statement = select(PurchaseOrder).where(
-            PurchaseOrder.payment_method == "先采后付",
-            PurchaseOrder.payment_status == "unpaid"
+            PurchaseOrder.payment_status == "账期未到"
         ).order_by(PurchaseOrder.order_date.desc())
         orders = session.exec(statement).all()
     except Exception:
-        # 如果 payment_status 字段不存在，查询所有先采后付订单
+        # 向后兼容：如果新状态不存在，尝试旧状态
         statement = select(PurchaseOrder).where(
-            PurchaseOrder.payment_method == "先采后付"
+            PurchaseOrder.payment_method == "先采后付",
+            PurchaseOrder.payment_status == "unpaid"
         ).order_by(PurchaseOrder.order_date.desc())
         orders = session.exec(statement).all()
 

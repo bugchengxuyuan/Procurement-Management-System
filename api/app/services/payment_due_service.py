@@ -27,18 +27,30 @@ def get_payment_due_groups(session: Session, include_paid: bool = False) -> List
     3. 支持过滤已付款/未付款订单
     """
 
-    # 查询先采后付订单
-    query = select(PurchaseOrder).where(
-        PurchaseOrder.payment_method == "先采后付"
-    )
-
-    # 是否包含已付款订单
-    if not include_paid:
+    # 查询先采后付订单（新状态系统：账期未到 + 账期已结）
+    if include_paid:
+        # 包含已付款：查询"账期未到"和"账期已结"
         try:
-            query = query.where(PurchaseOrder.payment_status == "unpaid")
+            query = select(PurchaseOrder).where(
+                PurchaseOrder.payment_status.in_(["账期未到", "账期已结"])
+            )
         except Exception:
-            # 如果字段不存在，查询全部
-            pass
+            # 向后兼容：如果新状态不存在，使用旧查询
+            query = select(PurchaseOrder).where(
+                PurchaseOrder.payment_method == "先采后付"
+            )
+    else:
+        # 只查询未付款：只查询"账期未到"
+        try:
+            query = select(PurchaseOrder).where(
+                PurchaseOrder.payment_status == "账期未到"
+            )
+        except Exception:
+            # 向后兼容
+            query = select(PurchaseOrder).where(
+                PurchaseOrder.payment_method == "先采后付",
+                PurchaseOrder.payment_status == "unpaid"
+            )
 
     orders = session.exec(query).all()
 
@@ -74,13 +86,19 @@ def get_payment_due_groups(session: Session, include_paid: bool = False) -> List
         # 统计金额
         total_amount = sum(float(o.purchase_amount) for o in orders_in_group)
 
-        # 统计付款状态
-        unpaid_orders = []
-        paid_orders = []
+        # 统计付款状态（新状态系统）
+        unpaid_orders = []  # 账期未到
+        paid_orders = []    # 账期已结
 
         for order in orders_in_group:
             payment_status = getattr(order, 'payment_status', None)
-            if payment_status == 'paid':
+            # 新状态系统
+            if payment_status == '账期已结':
+                paid_orders.append(order)
+            elif payment_status == '账期未到':
+                unpaid_orders.append(order)
+            # 向后兼容旧状态
+            elif payment_status == 'paid':
                 paid_orders.append(order)
             else:
                 unpaid_orders.append(order)
@@ -165,10 +183,16 @@ def get_payment_due_group_detail(
         订单详情列表和分页信息
     """
 
-    # 查询先采后付订单
-    query = select(PurchaseOrder).where(
-        PurchaseOrder.payment_method == "先采后付"
-    )
+    # 查询先采后付订单（新状态系统：账期未到 + 账期已结）
+    try:
+        query = select(PurchaseOrder).where(
+            PurchaseOrder.payment_status.in_(["账期未到", "账期已结"])
+        )
+    except Exception:
+        # 向后兼容
+        query = select(PurchaseOrder).where(
+            PurchaseOrder.payment_method == "先采后付"
+        )
 
     orders = session.exec(query).all()
 
@@ -243,7 +267,7 @@ def mark_payment_due_group_as_paid(
     session: Session,
     due_date: date
 ) -> Dict[str, Any]:
-    """将指定还款日的所有未付款订单标记为已付款
+    """将指定还款日的所有未付款订单标记为已付款（账期已结）
 
     Args:
         session: 数据库会话
@@ -253,16 +277,17 @@ def mark_payment_due_group_as_paid(
         更新结果统计
     """
 
-    # 查询先采后付订单
-    query = select(PurchaseOrder).where(
-        PurchaseOrder.payment_method == "先采后付"
-    )
-
+    # 查询"账期未到"的订单（新状态系统）
     try:
-        query = query.where(PurchaseOrder.payment_status == "unpaid")
+        query = select(PurchaseOrder).where(
+            PurchaseOrder.payment_status == "账期未到"
+        )
     except Exception:
-        # 如果字段不存在，跳过
-        pass
+        # 向后兼容
+        query = select(PurchaseOrder).where(
+            PurchaseOrder.payment_method == "先采后付",
+            PurchaseOrder.payment_status == "unpaid"
+        )
 
     orders = session.exec(query).all()
 
@@ -287,9 +312,9 @@ def mark_payment_due_group_as_paid(
         order_due_date = date(next_month.year, next_month.month, settings.PAYMENT_DUE_DAY)
 
         if order_due_date == due_date:
-            # 标记为已付款
+            # 标记为"账期已结"（新状态系统）
             if hasattr(order, 'payment_status'):
-                order.payment_status = 'paid'
+                order.payment_status = '账期已结'
                 updated_count += 1
                 updated_amount += float(order.purchase_amount)
 
