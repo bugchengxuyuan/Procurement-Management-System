@@ -171,15 +171,23 @@ def get_payment_due_list(session: Session):
     - 还款日：每月8号
     - 月结原则：本月确认收货，次月8号还款
     - 举例：10月确认收货 → 11月8日还款
-    - 只显示未付款订单（payment_status = 'unpaid'）
+    - 优先显示未付款订单（payment_status = 'unpaid'），兼容旧数据
     """
-    # 查询所有未付款的先采后付订单
-    statement = select(PurchaseOrder).where(
-        PurchaseOrder.payment_method == "先采后付",
-        PurchaseOrder.payment_status == "unpaid"
-    ).order_by(PurchaseOrder.receive_date.desc())
-
-    orders = session.exec(statement).all()
+    # 查询先采后付订单
+    # 尝试使用 payment_status 过滤，如果字段不存在则查询全部
+    try:
+        # 优先查询未付款订单
+        statement = select(PurchaseOrder).where(
+            PurchaseOrder.payment_method == "先采后付",
+            PurchaseOrder.payment_status == "unpaid"
+        ).order_by(PurchaseOrder.order_date.desc())
+        orders = session.exec(statement).all()
+    except Exception:
+        # 如果 payment_status 字段不存在，查询所有先采后付订单
+        statement = select(PurchaseOrder).where(
+            PurchaseOrder.payment_method == "先采后付"
+        ).order_by(PurchaseOrder.order_date.desc())
+        orders = session.exec(statement).all()
 
     today = date.today()
     result = []
@@ -187,11 +195,15 @@ def get_payment_due_list(session: Session):
     for order in orders:
         # 计算到期日期（次月8号）
         # 重要：账期按确认收货时间计算，不是订单日期
-        if order.receive_date:
-            # 使用确认收货时间
-            base_date = order.receive_date
-        else:
-            # 如果没有确认收货时间，降级使用订单日期
+        try:
+            if hasattr(order, 'receive_date') and order.receive_date:
+                # 使用确认收货时间
+                base_date = order.receive_date
+            else:
+                # 如果没有确认收货时间，降级使用订单日期
+                base_date = order.order_date
+        except AttributeError:
+            # 如果 receive_date 字段不存在，使用订单日期
             base_date = order.order_date
 
         # 获取确认收货所在月份的下个月
@@ -209,19 +221,26 @@ def get_payment_due_list(session: Session):
         else:
             status = "normal"  # 正常
 
-        result.append({
+        # 构建结果，兼容新旧字段
+        item = {
             "id": order.id,
             "order_no": order.order_no,
             "product_name": order.product_name,
             "supplier": order.supplier,
             "purchase_amount": float(order.purchase_amount),
             "order_date": order.order_date,
-            "receive_date": order.receive_date,
             "due_date": due_date,
             "days_remaining": days_remaining,
             "status": status,
-            "payment_status": order.payment_status,
-        })
+        }
+
+        # 添加可选字段
+        if hasattr(order, 'receive_date'):
+            item["receive_date"] = order.receive_date
+        if hasattr(order, 'payment_status'):
+            item["payment_status"] = order.payment_status
+
+        result.append(item)
 
     return result
 
