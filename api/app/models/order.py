@@ -18,6 +18,8 @@ class PurchaseOrderBase(SQLModel):
     order_date: date = Field(index=True)
     order_status: str = Field(index=True, max_length=20)
     payment_method: str = Field(index=True, max_length=20)
+    payment_status: Optional[str] = Field(default=None, index=True, max_length=20)  # 付款状态：unpaid/paid/partial
+    receive_date: Optional[date] = Field(default=None, index=True)  # 确认收货时间（1688账期按此计算）
     record_time: datetime
 
     @field_serializer('purchase_amount')
@@ -49,4 +51,6 @@ class PurchaseOrderUpdate(SQLModel):
     order_date: Optional[date] = None
     order_status: Optional[str] = None
     payment_method: Optional[str] = None
+    payment_status: Optional[str] = None  # 付款状态
+    receive_date: Optional[date] = None  # 确认收货时间
     record_time: Optional[datetime] = None

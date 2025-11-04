@@ -169,13 +169,15 @@ def get_payment_due_list(session: Session):
 
     业务规则：
     - 还款日：每月8号
-    - 月结原则：本月订单，次月8号还款
-    - 举例：10月订单 → 11月8日还款
+    - 月结原则：本月确认收货，次月8号还款
+    - 举例：10月确认收货 → 11月8日还款
+    - 只显示未付款订单（payment_status = 'unpaid'）
     """
-    # 查询所有先采后付订单
+    # 查询所有未付款的先采后付订单
     statement = select(PurchaseOrder).where(
-        PurchaseOrder.payment_method == "先采后付"
-    ).order_by(PurchaseOrder.order_date.desc())
+        PurchaseOrder.payment_method == "先采后付",
+        PurchaseOrder.payment_status == "unpaid"
+    ).order_by(PurchaseOrder.receive_date.desc())
 
     orders = session.exec(statement).all()
 
@@ -184,8 +186,16 @@ def get_payment_due_list(session: Session):
 
     for order in orders:
         # 计算到期日期（次月8号）
-        # 获取订单所在月份的下个月
-        next_month = order.order_date + relativedelta(months=1)
+        # 重要：账期按确认收货时间计算，不是订单日期
+        if order.receive_date:
+            # 使用确认收货时间
+            base_date = order.receive_date
+        else:
+            # 如果没有确认收货时间，降级使用订单日期
+            base_date = order.order_date
+
+        # 获取确认收货所在月份的下个月
+        next_month = base_date + relativedelta(months=1)
         # 设置为下个月的8号
         due_date = date(next_month.year, next_month.month, settings.PAYMENT_DUE_DAY)
 
@@ -203,11 +213,14 @@ def get_payment_due_list(session: Session):
             "id": order.id,
             "order_no": order.order_no,
             "product_name": order.product_name,
+            "supplier": order.supplier,
             "purchase_amount": float(order.purchase_amount),
             "order_date": order.order_date,
+            "receive_date": order.receive_date,
             "due_date": due_date,
             "days_remaining": days_remaining,
             "status": status,
+            "payment_status": order.payment_status,
         })
 
     return result
