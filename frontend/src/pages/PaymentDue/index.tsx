@@ -78,7 +78,7 @@ const PaymentDue: React.FC = () => {
     setDetailModalVisible(true);
     try {
       setDetailLoading(true);
-      const data = await getPaymentDueGroupDetail(group.due_date, 1, 100);
+      const data = await getPaymentDueGroupDetail(group.due_date, 1, 100, includePaid);
       setOrderDetails(data.items);
       setDetailTotal(data.total);
     } catch (error) {

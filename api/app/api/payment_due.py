@@ -54,6 +54,7 @@ def get_payment_due_group_detail(
     due_date: date_type,
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(50, ge=1, le=200, description="每页数量"),
+    include_paid: bool = Query(False, description="是否包含已付款订单"),
     session: Session = Depends(get_session)
 ):
     """获取指定还款日的订单详情列表
@@ -62,12 +63,13 @@ def get_payment_due_group_detail(
         due_date: 还款日期，格式：YYYY-MM-DD，例如 2025-11-08
         page: 页码
         page_size: 每页数量
+        include_paid: 是否包含已付款订单
 
     Returns:
         订单详情列表和分页信息
     """
     return payment_due_service.get_payment_due_group_detail(
-        session, due_date, page, page_size
+        session, due_date, page, page_size, include_paid
     )
 
 

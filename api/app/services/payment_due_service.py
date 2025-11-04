@@ -183,7 +183,8 @@ def get_payment_due_group_detail(
     session: Session,
     due_date: date,
     page: int = 1,
-    page_size: int = 50
+    page_size: int = 50,
+    include_paid: bool = False
 ) -> Dict[str, Any]:
     """获取指定还款日的订单详情
 
@@ -192,21 +193,36 @@ def get_payment_due_group_detail(
         due_date: 还款日期
         page: 页码
         page_size: 每页数量
+        include_paid: 是否包含已付款订单
 
     Returns:
         订单详情列表和分页信息
     """
 
     # 查询先采后付订单（新状态系统：账期未到 + 账期已结）
-    try:
-        query = select(PurchaseOrder).where(
-            PurchaseOrder.payment_status.in_(["账期未到", "账期已结"])
-        )
-    except Exception:
-        # 向后兼容
-        query = select(PurchaseOrder).where(
-            PurchaseOrder.payment_method == "先采后付"
-        )
+    if include_paid:
+        # 包含已付款：查询"账期未到"和"账期已结"
+        try:
+            query = select(PurchaseOrder).where(
+                PurchaseOrder.payment_status.in_(["账期未到", "账期已结"])
+            )
+        except Exception:
+            # 向后兼容
+            query = select(PurchaseOrder).where(
+                PurchaseOrder.payment_method == "先采后付"
+            )
+    else:
+        # 只查询未付款：只查询"账期未到"
+        try:
+            query = select(PurchaseOrder).where(
+                PurchaseOrder.payment_status == "账期未到"
+            )
+        except Exception:
+            # 向后兼容
+            query = select(PurchaseOrder).where(
+                PurchaseOrder.payment_method == "先采后付",
+                PurchaseOrder.payment_status == "unpaid"
+            )
 
     orders = session.exec(query).all()
 

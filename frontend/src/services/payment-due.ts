@@ -64,10 +64,11 @@ export const getPaymentDueGroups = (includePaid: boolean = false): Promise<Payme
 export const getPaymentDueGroupDetail = (
   dueDate: string,
   page: number = 1,
-  pageSize: number = 50
+  pageSize: number = 50,
+  includePaid: boolean = false
 ): Promise<PaymentDueGroupDetailResponse> => {
   return api.get(`/payment-due/groups/${dueDate}/detail`, {
-    params: { page, page_size: pageSize }
+    params: { page, page_size: pageSize, include_paid: includePaid }
   });
 };
 
