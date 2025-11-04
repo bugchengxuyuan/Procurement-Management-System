@@ -30,8 +30,8 @@ class Settings(BaseSettings):
     ]
 
     # 业务配置
-    DEFAULT_PAYMENT_TERM_DAYS: int = 30  # 先采后付默认账期
-    WARNING_DAYS: int = 5  # 到期提醒天数
+    PAYMENT_DUE_DAY: int = 8  # 先采后付月结还款日（每月8号）
+    WARNING_DAYS: int = 7  # 到期提醒天数（提前7天预警）
 
     class Config:
         env_file = ".env"

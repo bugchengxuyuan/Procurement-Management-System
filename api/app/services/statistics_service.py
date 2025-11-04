@@ -2,6 +2,7 @@
 统计服务
 """
 from datetime import date, timedelta
+from dateutil.relativedelta import relativedelta
 from typing import Optional
 from sqlmodel import Session, select, func
 from ..models import PurchaseOrder, Product
@@ -164,7 +165,13 @@ def get_dashboard_stats(
 
 
 def get_payment_due_list(session: Session):
-    """获取账期跟踪列表"""
+    """获取账期跟踪列表（月结8号逻辑）
+
+    业务规则：
+    - 还款日：每月8号
+    - 月结原则：本月订单，次月8号还款
+    - 举例：10月订单 → 11月8日还款
+    """
     # 查询所有先采后付订单
     statement = select(PurchaseOrder).where(
         PurchaseOrder.payment_method == "先采后付"
@@ -176,8 +183,12 @@ def get_payment_due_list(session: Session):
     result = []
 
     for order in orders:
-        # 计算到期日期
-        due_date = order.order_date + timedelta(days=settings.DEFAULT_PAYMENT_TERM_DAYS)
+        # 计算到期日期（次月8号）
+        # 获取订单所在月份的下个月
+        next_month = order.order_date + relativedelta(months=1)
+        # 设置为下个月的8号
+        due_date = date(next_month.year, next_month.month, settings.PAYMENT_DUE_DAY)
+
         days_remaining = (due_date - today).days
 
         # 判断状态
