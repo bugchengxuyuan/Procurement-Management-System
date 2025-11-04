@@ -15,6 +15,7 @@ import Dashboard from './pages/Dashboard';
 import OrderList from './pages/OrderList';
 import ProductAnalysis from './pages/ProductAnalysis';
 import ImportExport from './pages/ImportExport';
+import PaymentPending from './pages/PaymentPending';
 import './App.css';
 
 const { Header, Content, Sider } = Layout;
@@ -33,6 +34,11 @@ const App: React.FC = () => {
       key: '/orders',
       icon: <ShoppingCartOutlined />,
       label: <Link to="/orders">订单管理</Link>,
+    },
+    {
+      key: '/payment-pending',
+      icon: <CreditCardOutlined />,
+      label: <Link to="/payment-pending">先采后付</Link>,
     },
     {
       key: '/products',
@@ -77,6 +83,7 @@ const App: React.FC = () => {
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/orders" element={<OrderList />} />
+              <Route path="/payment-pending" element={<PaymentPending />} />
               <Route path="/products" element={<ProductAnalysis />} />
               <Route path="/import-export" element={<ImportExport />} />
               <Route path="*" element={<Navigate to="/" replace />} />
