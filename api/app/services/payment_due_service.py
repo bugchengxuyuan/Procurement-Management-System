@@ -133,16 +133,30 @@ def get_payment_due_groups(session: Session, include_paid: bool = False) -> List
         receive_month_start = min(receive_dates) if receive_dates else None
         receive_month_end = max(receive_dates) if receive_dates else None
 
-        # 判断是否是当月（账单可能不完整）
+        # 判断账单完整性
+        # 关键业务规则：只有当前月份确认收货的订单账单可能不完整
+        # 例如：今天11月4日
+        #   - 11月8日账单（10月确认收货）：10月已结束 → 完整 ✅
+        #   - 12月8日账单（11月确认收货）：11月进行中 → 不完整 ⚠️
         is_current_month = False
         is_incomplete = False
-        if receive_month_end:
-            # 如果最大确认收货日期的月份等于当前月份，说明账单可能不完整
-            if receive_month_end.year == today.year and receive_month_end.month == today.month:
+
+        if receive_month_start:
+            # 获取确认收货月份（以最早确认收货日期为准）
+            receive_month = receive_month_start.replace(day=1)  # 确认收货月份的第一天
+            current_month = today.replace(day=1)                # 当前月份的第一天
+
+            # 检查是否是当月确认收货
+            if receive_month == current_month:
                 is_current_month = True
-                # 如果还没到月末，账单肯定不完整
-                if today.day < 28:  # 保守估计，28号之前都认为不完整
+                # 当月账单：如果月份还没结束，账单肯定不完整
+                # 保守估计：28号之前都可能有新订单加入
+                if today.day < 28:
                     is_incomplete = True
+            else:
+                # 过去月份的账单：都是完整的（月份已结束）
+                is_current_month = False
+                is_incomplete = False
 
         result.append({
             "due_date": due_date,
