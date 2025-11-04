@@ -25,7 +25,7 @@ def generate_order_no() -> str:
 
 
 def parse_excel_orders(file_content: bytes):
-    """解析Excel文件中的订单数据（支持规格和供应商字段）"""
+    """解析Excel文件中的订单数据（支持规格和供应商字段，支持优化版格式）"""
     # 尝试读取Excel文件，自动检测工作表
     try:
         # 先尝试读取所有工作表名称
@@ -42,11 +42,19 @@ def parse_excel_orders(file_content: bytes):
         first_row = df.iloc[0].astype(str).tolist()
 
         if "日期" in first_row and "产品名称" in first_row:
+            # 检查是否为优化版格式（有"付款状态"字段）
+            if "付款状态" in first_row:
+                # 优化版格式：日期、付款状态、订单编号、产品名称、规格、采购金额、供应商、时间
+                df_data = df.iloc[1:, :8].copy()
+                df_data.columns = ["日期", "付款状态", "订单编号", "产品名称", "规格", "采购金额", "供应商", "时间"]
+                # 优化版标记
+                df_data["_format"] = "optimized"
             # 检查是否包含规格和供应商字段（新格式v2）
-            if "规格" in first_row and "供应商" in first_row:
+            elif "规格" in first_row and "供应商" in first_row:
                 # 新格式v2：包含规格和供应商，9列
                 df_data = df.iloc[1:, :9].copy()
                 df_data.columns = ["日期", "初始状态", "订单编号", "产品名称", "规格", "采购金额", "供应商", "时间", "先采后付"]
+                df_data["_format"] = "v2"
             else:
                 # 新格式v1：没有规格和供应商，7列
                 df_data = df.iloc[1:, :7].copy()
@@ -54,6 +62,7 @@ def parse_excel_orders(file_content: bytes):
                 # 添加空的规格和供应商列
                 df_data["规格"] = None
                 df_data["供应商"] = None
+                df_data["_format"] = "v1"
         else:
             # 旧格式：数据在列10-16，从第7行开始
             df_data = df.iloc[7:, 10:17].copy()
@@ -61,12 +70,16 @@ def parse_excel_orders(file_content: bytes):
             # 添加空的规格和供应商列
             df_data["规格"] = None
             df_data["供应商"] = None
+            df_data["_format"] = "old"
 
     except Exception as e:
         raise ValueError(f"无法读取Excel文件: {str(e)}")
 
     orders = []
     errors = []
+
+    # 获取数据格式
+    is_optimized = df_data.iloc[0]["_format"] == "optimized" if len(df_data) > 0 else False
 
     for idx, row in df_data.iterrows():
         try:
@@ -97,8 +110,39 @@ def parse_excel_orders(file_content: bytes):
             order_date = pd.to_datetime(row["日期"]).date()
             record_time = pd.to_datetime(row["时间"]) if pd.notna(row["时间"]) else datetime.now()
 
-            # 处理支付方式
-            payment_method = "先采后付" if row.get("先采后付") == "先采后付" else "已付款"
+            # 根据格式处理支付状态
+            if is_optimized:
+                # 优化版：使用"付款状态"字段
+                payment_status = str(row["付款状态"]).strip() if pd.notna(row["付款状态"]) else "即时付款"
+
+                # 向后兼容：为旧字段设置值
+                if payment_status == "即时付款":
+                    order_status = "已付款"
+                    payment_method = "已付款"
+                elif payment_status in ["账期未到", "账期已结"]:
+                    order_status = "先采后付"
+                    payment_method = "先采后付"
+                else:
+                    # 未知状态，默认为即时付款
+                    payment_status = "即时付款"
+                    order_status = "已付款"
+                    payment_method = "已付款"
+
+                # 对于账期订单，"日期"字段是确认收货日期
+                receive_date = order_date if payment_status in ["账期未到", "账期已结"] else None
+
+            else:
+                # 旧版/v1/v2：使用"初始状态"和"先采后付"字段
+                payment_method = "先采后付" if row.get("先采后付") == "先采后付" else "已付款"
+                order_status = str(row["初始状态"]).strip() if pd.notna(row["初始状态"]) else "已付款"
+
+                # 映射到新的payment_status
+                if payment_method == "先采后付":
+                    payment_status = "账期未到"  # 默认为账期未到
+                else:
+                    payment_status = "即时付款"
+
+                receive_date = None
 
             order_data = {
                 "order_no": order_no,
@@ -107,8 +151,10 @@ def parse_excel_orders(file_content: bytes):
                 "purchase_amount": float(row["采购金额"]),
                 "supplier": str(row["供应商"]).strip() if pd.notna(row["供应商"]) else None,
                 "order_date": order_date,
-                "order_status": str(row["初始状态"]).strip() if pd.notna(row["初始状态"]) else "已付款",
-                "payment_method": payment_method,
+                "order_status": order_status,  # DEPRECATED
+                "payment_method": payment_method,  # DEPRECATED
+                "payment_status": payment_status,  # 新字段
+                "receive_date": receive_date,  # 确认收货日期
                 "record_time": record_time,
             }
 
