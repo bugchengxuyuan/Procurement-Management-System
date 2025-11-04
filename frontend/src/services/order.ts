@@ -11,8 +11,10 @@ export interface Order {
   purchase_amount: number;
   supplier?: string | null;
   order_date: string;
+  receive_date?: string | null;
   order_status: string;
   payment_method: string;
+  payment_status?: string;
   record_time: string;
   created_at: string;
   updated_at: string;
@@ -26,6 +28,7 @@ export interface OrderListParams {
   supplier?: string;
   order_status?: string;
   payment_method?: string;
+  payment_status?: string;
   start_date?: string;
   end_date?: string;
   search?: string;
@@ -47,8 +50,10 @@ export interface OrderCreateParams {
   purchase_amount: number;
   supplier?: string;
   order_date: string;
+  receive_date?: string;
   order_status: string;
   payment_method: string;
+  payment_status?: string;
   record_time?: string;
 }
 
@@ -58,8 +63,10 @@ export interface OrderUpdateParams {
   purchase_amount?: number;
   supplier?: string;
   order_date?: string;
+  receive_date?: string;
   order_status?: string;
   payment_method?: string;
+  payment_status?: string;
   record_time?: string;
 }
 

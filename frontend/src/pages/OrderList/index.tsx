@@ -22,6 +22,9 @@ import {
   ReloadOutlined,
   UploadOutlined,
   DownloadOutlined,
+  CheckCircleOutlined,
+  ClockCircleOutlined,
+  DollarOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
@@ -80,6 +83,7 @@ const OrderList: React.FC = () => {
       supplier: values.supplier,
       order_status: values.order_status,
       payment_method: values.payment_method,
+      payment_status: values.payment_status,
     };
 
     if (values.dateRange && values.dateRange.length === 2) {
@@ -188,6 +192,25 @@ const OrderList: React.FC = () => {
     }
   };
 
+  const getPaymentStatusTag = (status?: string) => {
+    if (!status) return '-';
+
+    const statusConfig: Record<string, { color: string; icon: React.ReactNode; text: string }> = {
+      '即时付款': { color: 'blue', icon: <DollarOutlined />, text: '即时付款' },
+      '账期未到': { color: 'orange', icon: <ClockCircleOutlined />, text: '账期未到' },
+      '账期已结': { color: 'green', icon: <CheckCircleOutlined />, text: '账期已结' },
+    };
+
+    const config = statusConfig[status];
+    if (!config) return status;
+
+    return (
+      <Tag color={config.color} icon={config.icon}>
+        {config.text}
+      </Tag>
+    );
+  };
+
   const columns: ColumnsType<Order> = [
     {
       title: '订单日期',
@@ -230,6 +253,13 @@ const OrderList: React.FC = () => {
       render: (supplier: string | null) => supplier || '-',
     },
     {
+      title: '确认收货日期',
+      dataIndex: 'receive_date',
+      key: 'receive_date',
+      width: 130,
+      render: (date: string | null) => date ? dayjs(date).format('YYYY-MM-DD') : '-',
+    },
+    {
       title: '订单状态',
       dataIndex: 'order_status',
       key: 'order_status',
@@ -240,6 +270,13 @@ const OrderList: React.FC = () => {
       dataIndex: 'payment_method',
       key: 'payment_method',
       width: 100,
+    },
+    {
+      title: '付款状态',
+      dataIndex: 'payment_status',
+      key: 'payment_status',
+      width: 120,
+      render: (status: string) => getPaymentStatusTag(status),
     },
     {
       title: '操作',
@@ -312,7 +349,16 @@ const OrderList: React.FC = () => {
                 </Select>
               </Form.Item>
             </Col>
-            <Col span={12}>
+            <Col span={6}>
+              <Form.Item name="payment_status" label="付款状态">
+                <Select placeholder="请选择" allowClear>
+                  <Select.Option value="即时付款">即时付款</Select.Option>
+                  <Select.Option value="账期未到">账期未到</Select.Option>
+                  <Select.Option value="账期已结">账期已结</Select.Option>
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={6}>
               <Form.Item name="dateRange" label="日期范围">
                 <RangePicker style={{ width: '100%' }} />
               </Form.Item>
@@ -368,7 +414,7 @@ const OrderList: React.FC = () => {
             setPageSize(pageSize);
           },
         }}
-        scroll={{ x: 1500 }}
+        scroll={{ x: 1700 }}
       />
 
       {/* 新建/编辑订单Modal */}
