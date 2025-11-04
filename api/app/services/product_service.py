@@ -61,17 +61,56 @@ def get_products(
 
     products = session.exec(statement).all()
 
+    # 计算总金额
+    total_amount = sum(p.total_purchase_amount for p in products)
+
+    # 为每个产品添加百分比
+    items = []
+    for product in products:
+        product_dict = {
+            "id": product.id,
+            "product_name": product.product_name,
+            "total_purchase_amount": product.total_purchase_amount,
+            "total_order_count": product.total_order_count,
+            "avg_unit_price": product.avg_unit_price,
+            "last_purchase_date": product.last_purchase_date.isoformat() if product.last_purchase_date else None,
+            "created_at": product.created_at.isoformat(),
+            "updated_at": product.updated_at.isoformat(),
+            "percentage": round((product.total_purchase_amount / total_amount * 100) if total_amount > 0 else 0, 2)
+        }
+        items.append(product_dict)
+
     return {
         "total": total,
         "page": page,
         "size": page_size,
-        "items": products,
+        "total_amount": total_amount,
+        "items": items,
     }
 
 
-def get_product(session: Session, product_id: int) -> Optional[Product]:
-    """获取单个产品"""
-    return session.get(Product, product_id)
+def get_product(session: Session, product_id: int):
+    """获取产品详情（包括订单历史和月度趋势）"""
+    product = session.get(Product, product_id)
+    if not product:
+        return None
+
+    # 获取最近订单
+    recent_orders = session.exec(
+        select(PurchaseOrder)
+        .where(PurchaseOrder.product_name == product.product_name)
+        .order_by(PurchaseOrder.order_date.desc())
+        .limit(10)
+    ).all()
+
+    # 获取月度趋势
+    monthly_trend = get_product_monthly_trend(session, product.product_name)
+
+    return {
+        "product": product,
+        "recent_orders": recent_orders,
+        "monthly_trend": monthly_trend,
+    }
 
 
 def get_product_orders(session: Session, product_name: str):
