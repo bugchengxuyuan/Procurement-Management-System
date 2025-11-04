@@ -15,6 +15,7 @@ import {
   Row,
   Col,
   Upload,
+  Tag,
 } from 'antd';
 import {
   PlusOutlined,
@@ -446,24 +447,21 @@ const OrderList: React.FC = () => {
             <DatePicker style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item
-            name="order_status"
-            label="订单状态"
-            rules={[{ required: true, message: '请选择订单状态' }]}
+            name="payment_status"
+            label="付款状态"
+            rules={[{ required: true, message: '请选择付款状态' }]}
           >
             <Select placeholder="请选择">
-              <Select.Option value="已付款">已付款</Select.Option>
-              <Select.Option value="先采后付">先采后付</Select.Option>
+              <Select.Option value="即时付款">即时付款</Select.Option>
+              <Select.Option value="账期未到">账期未到</Select.Option>
+              <Select.Option value="账期已结">账期已结</Select.Option>
             </Select>
           </Form.Item>
           <Form.Item
-            name="payment_method"
-            label="支付方式"
-            rules={[{ required: true, message: '请选择支付方式' }]}
+            name="receive_date"
+            label="确认收货日期"
           >
-            <Select placeholder="请选择">
-              <Select.Option value="已付款">已付款</Select.Option>
-              <Select.Option value="先采后付">先采后付</Select.Option>
-            </Select>
+            <DatePicker style={{ width: '100%' }} placeholder="仅账期订单需要填写" />
           </Form.Item>
         </Form>
       </Modal>
