@@ -1,0 +1,295 @@
+"""
+先采后付按还款日分组统计服务
+"""
+from datetime import date
+from dateutil.relativedelta import relativedelta
+from typing import Optional, List, Dict, Any
+from sqlmodel import Session, select
+from collections import defaultdict
+
+from ..models import PurchaseOrder
+from ..core.config import settings
+
+
+def get_payment_due_groups(session: Session, include_paid: bool = False) -> List[Dict[str, Any]]:
+    """获取先采后付订单按还款日分组统计
+
+    Args:
+        session: 数据库会话
+        include_paid: 是否包含已付款订单
+
+    Returns:
+        按还款日分组的订单统计列表
+
+    业务逻辑：
+    1. 按确认收货月份分组（10月确认→11月8日还款，11月确认→12月8日还款）
+    2. 动态实时计算，不依赖静态账单文件
+    3. 支持过滤已付款/未付款订单
+    """
+
+    # 查询先采后付订单
+    query = select(PurchaseOrder).where(
+        PurchaseOrder.payment_method == "先采后付"
+    )
+
+    # 是否包含已付款订单
+    if not include_paid:
+        try:
+            query = query.where(PurchaseOrder.payment_status == "unpaid")
+        except Exception:
+            # 如果字段不存在，查询全部
+            pass
+
+    orders = session.exec(query).all()
+
+    # 按还款日分组
+    payment_groups = defaultdict(list)
+
+    for order in orders:
+        # 确定基准日期（确认收货时间优先，其次订单日期）
+        try:
+            if hasattr(order, 'receive_date') and order.receive_date:
+                base_date = order.receive_date
+            else:
+                base_date = order.order_date
+        except AttributeError:
+            base_date = order.order_date
+
+        # 计算还款日（次月8号）
+        next_month = base_date + relativedelta(months=1)
+        due_date = date(next_month.year, next_month.month, settings.PAYMENT_DUE_DAY)
+
+        payment_groups[due_date].append(order)
+
+    # 构建结果
+    today = date.today()
+    result = []
+
+    for due_date in sorted(payment_groups.keys()):
+        orders_in_group = payment_groups[due_date]
+
+        # 统计金额
+        total_amount = sum(float(o.purchase_amount) for o in orders_in_group)
+
+        # 统计付款状态
+        unpaid_orders = []
+        paid_orders = []
+
+        for order in orders_in_group:
+            payment_status = getattr(order, 'payment_status', None)
+            if payment_status == 'paid':
+                paid_orders.append(order)
+            else:
+                unpaid_orders.append(order)
+
+        unpaid_amount = sum(float(o.purchase_amount) for o in unpaid_orders)
+        paid_amount = sum(float(o.purchase_amount) for o in paid_orders)
+
+        # 计算剩余天数和状态
+        days_remaining = (due_date - today).days
+
+        if days_remaining < 0:
+            status = "overdue"
+            status_text = f"已逾期 {abs(days_remaining)} 天"
+        elif days_remaining <= settings.WARNING_DAYS:
+            status = "warning"
+            status_text = f"即将到期（{days_remaining}天后）"
+        else:
+            status = "normal"
+            status_text = f"{days_remaining}天后"
+
+        # 确定确认收货月份范围
+        receive_dates = []
+        for order in orders_in_group:
+            try:
+                if hasattr(order, 'receive_date') and order.receive_date:
+                    receive_dates.append(order.receive_date)
+                else:
+                    receive_dates.append(order.order_date)
+            except AttributeError:
+                receive_dates.append(order.order_date)
+
+        receive_month_start = min(receive_dates) if receive_dates else None
+        receive_month_end = max(receive_dates) if receive_dates else None
+
+        # 判断是否是当月（账单可能不完整）
+        is_current_month = False
+        is_incomplete = False
+        if receive_month_end:
+            # 如果最大确认收货日期的月份等于当前月份，说明账单可能不完整
+            if receive_month_end.year == today.year and receive_month_end.month == today.month:
+                is_current_month = True
+                # 如果还没到月末，账单肯定不完整
+                if today.day < 28:  # 保守估计，28号之前都认为不完整
+                    is_incomplete = True
+
+        result.append({
+            "due_date": due_date,
+            "days_remaining": days_remaining,
+            "status": status,
+            "status_text": status_text,
+            "total_count": len(orders_in_group),
+            "total_amount": total_amount,
+            "unpaid_count": len(unpaid_orders),
+            "unpaid_amount": unpaid_amount,
+            "paid_count": len(paid_orders),
+            "paid_amount": paid_amount,
+            "receive_month_start": receive_month_start,
+            "receive_month_end": receive_month_end,
+            "is_current_month": is_current_month,
+            "is_incomplete": is_incomplete,
+            "order_ids": [o.id for o in orders_in_group],
+        })
+
+    return result
+
+
+def get_payment_due_group_detail(
+    session: Session,
+    due_date: date,
+    page: int = 1,
+    page_size: int = 50
+) -> Dict[str, Any]:
+    """获取指定还款日的订单详情
+
+    Args:
+        session: 数据库会话
+        due_date: 还款日期
+        page: 页码
+        page_size: 每页数量
+
+    Returns:
+        订单详情列表和分页信息
+    """
+
+    # 查询先采后付订单
+    query = select(PurchaseOrder).where(
+        PurchaseOrder.payment_method == "先采后付"
+    )
+
+    orders = session.exec(query).all()
+
+    # 筛选属于指定还款日的订单
+    matching_orders = []
+
+    for order in orders:
+        # 确定基准日期
+        try:
+            if hasattr(order, 'receive_date') and order.receive_date:
+                base_date = order.receive_date
+            else:
+                base_date = order.order_date
+        except AttributeError:
+            base_date = order.order_date
+
+        # 计算还款日
+        next_month = base_date + relativedelta(months=1)
+        order_due_date = date(next_month.year, next_month.month, settings.PAYMENT_DUE_DAY)
+
+        if order_due_date == due_date:
+            matching_orders.append(order)
+
+    # 排序：未付款优先，然后按日期倒序
+    matching_orders.sort(
+        key=lambda o: (
+            getattr(o, 'payment_status', 'unpaid') == 'paid',  # 未付款在前
+            -(getattr(o, 'receive_date', o.order_date) or o.order_date).toordinal()  # 日期倒序
+        )
+    )
+
+    # 分页
+    total = len(matching_orders)
+    start = (page - 1) * page_size
+    end = start + page_size
+    page_orders = matching_orders[start:end]
+
+    # 构建结果
+    items = []
+    for order in page_orders:
+        item = {
+            "id": order.id,
+            "order_no": order.order_no,
+            "product_name": order.product_name,
+            "supplier": order.supplier,
+            "purchase_amount": float(order.purchase_amount),
+            "order_date": order.order_date,
+        }
+
+        # 添加可选字段
+        if hasattr(order, 'receive_date'):
+            item["receive_date"] = order.receive_date
+        if hasattr(order, 'payment_status'):
+            item["payment_status"] = order.payment_status
+        if hasattr(order, 'spec'):
+            item["spec"] = order.spec
+
+        items.append(item)
+
+    return {
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "items": items,
+        "due_date": due_date,
+    }
+
+
+def mark_payment_due_group_as_paid(
+    session: Session,
+    due_date: date
+) -> Dict[str, Any]:
+    """将指定还款日的所有未付款订单标记为已付款
+
+    Args:
+        session: 数据库会话
+        due_date: 还款日期
+
+    Returns:
+        更新结果统计
+    """
+
+    # 查询先采后付订单
+    query = select(PurchaseOrder).where(
+        PurchaseOrder.payment_method == "先采后付"
+    )
+
+    try:
+        query = query.where(PurchaseOrder.payment_status == "unpaid")
+    except Exception:
+        # 如果字段不存在，跳过
+        pass
+
+    orders = session.exec(query).all()
+
+    # 筛选属于指定还款日的订单
+    updated_count = 0
+    updated_amount = 0.0
+
+    for order in orders:
+        # 确定基准日期
+        try:
+            if hasattr(order, 'receive_date') and order.receive_date:
+                base_date = order.receive_date
+            else:
+                base_date = order.order_date
+        except AttributeError:
+            base_date = order.order_date
+
+        # 计算还款日
+        next_month = base_date + relativedelta(months=1)
+        order_due_date = date(next_month.year, next_month.month, settings.PAYMENT_DUE_DAY)
+
+        if order_due_date == due_date:
+            # 标记为已付款
+            if hasattr(order, 'payment_status'):
+                order.payment_status = 'paid'
+                updated_count += 1
+                updated_amount += float(order.purchase_amount)
+
+    session.commit()
+
+    return {
+        "due_date": due_date,
+        "updated_count": updated_count,
+        "updated_amount": updated_amount,
+    }
