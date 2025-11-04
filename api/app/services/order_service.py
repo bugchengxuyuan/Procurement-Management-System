@@ -28,8 +28,7 @@ def get_orders(
     product_name: Optional[str] = None,
     spec: Optional[str] = None,
     supplier: Optional[str] = None,
-    order_status: Optional[str] = None,
-    payment_method: Optional[str] = None,
+    payment_status: Optional[str] = None,
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     search: Optional[str] = None,
@@ -45,10 +44,8 @@ def get_orders(
         statement = statement.where(PurchaseOrder.spec == spec)
     if supplier:
         statement = statement.where(PurchaseOrder.supplier == supplier)
-    if order_status:
-        statement = statement.where(PurchaseOrder.order_status == order_status)
-    if payment_method:
-        statement = statement.where(PurchaseOrder.payment_method == payment_method)
+    if payment_status:
+        statement = statement.where(PurchaseOrder.payment_status == payment_status)
     if start_date:
         statement = statement.where(PurchaseOrder.order_date >= start_date)
     if end_date:
