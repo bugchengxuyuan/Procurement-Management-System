@@ -66,7 +66,7 @@ export const getPaymentDueGroupDetail = (
   page: number = 1,
   pageSize: number = 50
 ): Promise<PaymentDueGroupDetailResponse> => {
-  return api.get(`/payment-due/groups/${dueDate}`, {
+  return api.get(`/payment-due/groups/${dueDate}/detail`, {
     params: { page, page_size: pageSize }
   });
 };
