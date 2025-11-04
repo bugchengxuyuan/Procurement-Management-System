@@ -46,14 +46,17 @@ def get_payment_due_groups(session: Session, include_paid: bool = False) -> List
     payment_groups = defaultdict(list)
 
     for order in orders:
-        # 确定基准日期（确认收货时间优先，其次订单日期）
+        # 1688规则：只有确认收货的订单才进入账期
+        # 必须有 receive_date，不能用 order_date 代替
         try:
-            if hasattr(order, 'receive_date') and order.receive_date:
-                base_date = order.receive_date
-            else:
-                base_date = order.order_date
+            if not hasattr(order, 'receive_date') or not order.receive_date:
+                # 跳过没有确认收货时间的订单
+                continue
+
+            base_date = order.receive_date
         except AttributeError:
-            base_date = order.order_date
+            # 如果字段不存在，跳过
+            continue
 
         # 计算还款日（次月8号）
         next_month = base_date + relativedelta(months=1)
@@ -173,14 +176,16 @@ def get_payment_due_group_detail(
     matching_orders = []
 
     for order in orders:
-        # 确定基准日期
+        # 1688规则：只有确认收货的订单才进入账期
         try:
-            if hasattr(order, 'receive_date') and order.receive_date:
-                base_date = order.receive_date
-            else:
-                base_date = order.order_date
+            if not hasattr(order, 'receive_date') or not order.receive_date:
+                # 跳过没有确认收货时间的订单
+                continue
+
+            base_date = order.receive_date
         except AttributeError:
-            base_date = order.order_date
+            # 如果字段不存在，跳过
+            continue
 
         # 计算还款日
         next_month = base_date + relativedelta(months=1)
@@ -266,14 +271,16 @@ def mark_payment_due_group_as_paid(
     updated_amount = 0.0
 
     for order in orders:
-        # 确定基准日期
+        # 1688规则：只有确认收货的订单才进入账期
         try:
-            if hasattr(order, 'receive_date') and order.receive_date:
-                base_date = order.receive_date
-            else:
-                base_date = order.order_date
+            if not hasattr(order, 'receive_date') or not order.receive_date:
+                # 跳过没有确认收货时间的订单
+                continue
+
+            base_date = order.receive_date
         except AttributeError:
-            base_date = order.order_date
+            # 如果字段不存在，跳过
+            continue
 
         # 计算还款日
         next_month = base_date + relativedelta(months=1)

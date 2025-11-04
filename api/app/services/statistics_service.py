@@ -193,18 +193,17 @@ def get_payment_due_list(session: Session):
     result = []
 
     for order in orders:
-        # 计算到期日期（次月8号）
-        # 重要：账期按确认收货时间计算，不是订单日期
+        # 1688规则：当月确认收货的订单，将在下月8号付款
+        # 必须有 receive_date，不能用 order_date 代替
         try:
-            if hasattr(order, 'receive_date') and order.receive_date:
-                # 使用确认收货时间
-                base_date = order.receive_date
-            else:
-                # 如果没有确认收货时间，降级使用订单日期
-                base_date = order.order_date
+            if not hasattr(order, 'receive_date') or not order.receive_date:
+                # 跳过没有确认收货时间的订单
+                continue
+
+            base_date = order.receive_date
         except AttributeError:
-            # 如果 receive_date 字段不存在，使用订单日期
-            base_date = order.order_date
+            # 如果字段不存在，跳过
+            continue
 
         # 获取确认收货所在月份的下个月
         next_month = base_date + relativedelta(months=1)
@@ -221,7 +220,7 @@ def get_payment_due_list(session: Session):
         else:
             status = "normal"  # 正常
 
-        # 构建结果，兼容新旧字段
+        # 构建结果
         item = {
             "id": order.id,
             "order_no": order.order_no,
@@ -229,14 +228,13 @@ def get_payment_due_list(session: Session):
             "supplier": order.supplier,
             "purchase_amount": float(order.purchase_amount),
             "order_date": order.order_date,
+            "receive_date": order.receive_date,
             "due_date": due_date,
             "days_remaining": days_remaining,
             "status": status,
         }
 
         # 添加可选字段
-        if hasattr(order, 'receive_date'):
-            item["receive_date"] = order.receive_date
         if hasattr(order, 'payment_status'):
             item["payment_status"] = order.payment_status
 
