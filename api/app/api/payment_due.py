@@ -6,7 +6,7 @@ from sqlmodel import Session
 from datetime import date as date_type
 from typing import Optional
 
-from ..db import get_session
+from ..core.database import get_session
 from ..services import payment_due_service
 
 router = APIRouter(prefix="/payment-due", tags=["先采后付管理"])
