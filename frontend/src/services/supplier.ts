@@ -72,6 +72,9 @@ export const getSupplierStats = (supplierName: string): Promise<SupplierStats> =
 };
 
 // Get supplier orders
-export const getSupplierOrders = (supplierName: string, params: SupplierOrdersParams) => {
+export const getSupplierOrders = (
+  supplierName: string,
+  params: SupplierOrdersParams
+): Promise<{ total: number; page: number; size: number; items: any[] }> => {
   return api.get(`/suppliers/${encodeURIComponent(supplierName)}/orders`, { params });
 };

@@ -8,7 +8,6 @@ import {
   Button,
   DatePicker,
   Input,
-  Select,
   Space,
   Spin,
   message,
@@ -86,13 +85,13 @@ const SupplierDetail: React.FC = () => {
     if (!supplierName) return;
     try {
       setOrdersLoading(true);
-      const data = await getSupplierOrders(decodeURIComponent(supplierName), {
+      const response = await getSupplierOrders(decodeURIComponent(supplierName), {
         page: ordersPage,
         page_size: ordersPageSize,
         ...orderFilters,
       });
-      setOrders(data.items);
-      setOrdersTotal(data.total);
+      setOrders(response.items);
+      setOrdersTotal(response.total);
     } catch (error) {
       console.error('加载订单列表失败:', error);
     } finally {

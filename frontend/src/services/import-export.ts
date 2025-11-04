@@ -29,6 +29,8 @@ export const importExcel = (file: File): Promise<ImportResult> => {
 // Export Excel file
 export const exportExcel = (params?: {
   product_name?: string;
+  spec?: string;
+  supplier?: string;
   order_status?: string;
   payment_method?: string;
   start_date?: string;
